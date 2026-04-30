@@ -1,3 +1,13 @@
 spring:
   application:
-    name: order
+    name: order-service
+
+  config:
+    import: "configserver:"      # Config Server에서 설정 가져옴
+  cloud:
+    config:
+      uri: http://config-server:8888
+      fail-fast: false
+      retry:
+        max-attempts: 3
+        initial-interval: 1000
