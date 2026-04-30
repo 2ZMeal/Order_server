@@ -14,11 +14,6 @@ java {
     }
 }
 
-//repositories {
-//    mavenCentral()
-//}
-
-// 공통 모듈 사용을 위해 하단 repositories를 아래와 같이 수정 필요
 repositories {
     mavenCentral()
     maven {
@@ -31,14 +26,8 @@ repositories {
     }
 }
 
-
-//ext {
-//    set('springCloudVersion', "2025.1.1")
-//}
-
-// 공통 모듈 사용을 위해 하단 ext 추가 필요
 ext {
-    set('springCloudVersion', "2025.0.2")
+    set('springCloudVersion', "2025.1.1")
 }
 
 dependencies {
@@ -79,16 +68,10 @@ dependencies {
 }
 
 
-//// 공통 모듈 사용을 위해 하단 dependencyManagement 추가 필요
-//dependencyManagement {
-//    imports {
-//        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
-//    }
-//}
-
+// 공통 모듈 사용을 위해 하단 dependencyManagement 추가 필요
 dependencyManagement {
     imports {
-        mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.0.0'
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
     }
 }
 
