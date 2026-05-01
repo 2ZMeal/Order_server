@@ -22,11 +22,11 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "customer_username", nullable = false, length = 100)
-    private String customerUsername;
+    @Column(name = "user_username", nullable = false, length = 100)
+    private String userUsername;
 
-    @Column(name = "store_id", nullable = false)
-    private UUID storeId;
+    @Column(name = "company_id", nullable = false)
+    private UUID companyId;
 
     @Column(name = "delivery_address", length = 255)
     private String deliveryAddress;
@@ -101,12 +101,12 @@ public class Order {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String customerUsername, UUID storeId,
+    public static Order create(String userUsername, UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote, OrderType orderType) {
         return Order.builder()
-                .customerUsername(customerUsername)
-                .storeId(storeId)
+                .userUsername(userUsername)
+                .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)
                 .requestNote(requestNote)
@@ -114,7 +114,7 @@ public class Order {
                 .status(OrderStatus.READY)
                 .sagaStatus(SagaStatus.ORDER_CREATED)
                 .createdAt(LocalDateTime.now())
-                .createdBy(customerUsername)
+                .createdBy(userUsername)
                 .build();
     }
 
@@ -188,7 +188,7 @@ public class Order {
     }
 
     /**
-     * 주문 상태 변경 (OWNER/MANAGER 권한)
+     * 주문 상태 변경 (COMPANY 권한)
      * - 취소/완료 후 변경 불가
      * - 상태 전이 규칙 검증
      */

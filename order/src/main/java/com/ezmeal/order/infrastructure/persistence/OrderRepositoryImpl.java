@@ -1,7 +1,7 @@
 package com.ezmeal.order.infrastructure.persistence;
 
-import com.delivery.orderservice.domain.entity.Order;
-import com.delivery.orderservice.domain.repository.OrderRepository;
+import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.domain.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,20 +36,20 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Page<Order> findByCustomerUsername(String username, Pageable pageable) {
-        return jpaRepository.findByCustomerUsername(username, pageable);
+    public Page<Order> findByUserUsername(String username, Pageable pageable) {
+        return jpaRepository.findByUserUsername(username, pageable);
     }
 
     @Override
-    public Page<Order> findByStoreId(UUID storeId, Pageable pageable) {
-        return jpaRepository.findByStoreId(storeId, pageable);
+    public Page<Order> findByCompanyId(UUID companyId, Pageable pageable) {
+        return jpaRepository.findByCompanyId(companyId, pageable);
     }
 
     @Override
-    public Page<Order> searchWithFilters(UUID storeId, String customerUsername,
+    public Page<Order> searchWithFilters(UUID companyId, String userUsername,
                                          Order.OrderStatus status, String productName,
                                          Integer minAmount, Integer maxAmount, Pageable pageable) {
         return jpaRepository.searchWithFilters(
-                storeId, customerUsername, status, productName, minAmount, maxAmount, pageable);
+                companyId, userUsername, status, productName, minAmount, maxAmount, pageable);
     }
 }

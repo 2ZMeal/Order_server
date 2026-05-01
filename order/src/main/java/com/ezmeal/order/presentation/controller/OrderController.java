@@ -1,11 +1,11 @@
 package com.ezmeal.order.presentation.controller;
 
-import com.delivery.orderservice.application.dto.request.OrderRequestDto;
-import com.delivery.orderservice.application.dto.request.OrderSearchRequestDto;
-import com.delivery.orderservice.application.dto.response.OrderResponseDto;
-import com.delivery.orderservice.application.service.OrderService;
-import com.delivery.orderservice.domain.entity.Order;
-import com.delivery.orderservice.presentation.response.ApiResponse;
+import com.ezmeal.order.application.dto.request.OrderRequestDto;
+import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
+import com.ezmeal.order.application.dto.response.OrderResponseDto;
+import com.ezmeal.order.application.service.OrderService;
+import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.presentation.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class OrderController {
 
     @GetMapping("/list")
     @Operation(summary = "주문 목록 조회",
-            description = "권한별 조회 - ADMIN/MANAGER: 전체, OWNER: 본인 가게, CUSTOMER: 본인 주문")
+            description = "권한별 조회 - ADMIN: 전체, COMPANY: 본인 가게, USER: 본인 주문")
     public ResponseEntity<ApiResponse<Page<OrderResponseDto>>> getOrders(
             @AuthenticationPrincipal UserDetails userDetails,
             @PageableDefault(size = 10, sort = "createdAt",
@@ -106,7 +106,7 @@ public class OrderController {
     @PatchMapping("/{orderId}/status")
     @Operation(summary = "주문 상태 변경",
             description = """
-                   OWNER/MANAGER: 상태 전이 규칙에 따라 변경
+                   COMPANY: 상태 전이 규칙에 따라 변경
                    - CONFIRMED → DELIVERING: shipment-service 배달 시작
                    - DELIVERING → COMPLETED: notification-service 리뷰 요청 알림 발행
                    모든 상태 변경 시 notification-service 상태 알림 발행

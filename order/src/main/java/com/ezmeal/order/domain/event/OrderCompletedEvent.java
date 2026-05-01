@@ -18,9 +18,9 @@ import java.util.UUID;
 public class OrderCompletedEvent {
 
     private UUID orderId;
-    private UUID storeId;
-    private String storeName;
-    private String customerUsername;
+    private UUID companyId;
+    private String companyName;
+    private String userUsername;
     private List<String> productNames;   // 리뷰 대상 상품 목록
     private Integer totalPrice;
     private LocalDateTime completedAt;

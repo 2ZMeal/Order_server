@@ -1,6 +1,6 @@
 package com.ezmeal.order.infrastructure.client;
 
-import com.delivery.orderservice.infrastructure.client.dto.ProductInfo;
+import com.ezmeal.order.infrastructure.client.dto.ProductInfo;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;

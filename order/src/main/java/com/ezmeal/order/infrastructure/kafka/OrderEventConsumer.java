@@ -1,7 +1,7 @@
 package com.ezmeal.order.infrastructure.kafka;
 
-import com.delivery.orderservice.application.saga.OrderSagaOrchestrator;
-import com.delivery.orderservice.infrastructure.kafka.dto.PaymentResultMessage;
+import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
+import com.ezmeal.order.infrastructure.kafka.dto.PaymentResultMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +44,7 @@ public class OrderEventConsumer {
                 sagaOrchestrator.onPaymentCompleted(
                         result.getOrderId(),
                         result.getPaymentId(),
-                        result.getCustomerUsername()
+                        result.getUserUsername()
                 );
             } else {
                 sagaOrchestrator.onPaymentFailed(

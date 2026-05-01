@@ -37,8 +37,8 @@ spring:
 
 # 타 MSA 서비스 URL (Eureka 사용 시 서비스명으로 대체 가능)
 services:
-  store:
-    url: ${STORE_SERVICE_URL:http://store-service}
+  company:
+    url: ${STORE_SERVICE_URL:http://company-service}
   product:
     url: ${PRODUCT_SERVICE_URL:http://product-service}
 

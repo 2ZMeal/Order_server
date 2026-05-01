@@ -5,7 +5,7 @@ import java.util.List;
 
 @Getter
 public class OrderRequestDto {
-    private String storeName;
+    private String companyName;
     private String address;
     private String comment;
     private List<ProductItem> products;

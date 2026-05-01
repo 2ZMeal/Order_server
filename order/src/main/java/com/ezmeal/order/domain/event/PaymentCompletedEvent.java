@@ -17,8 +17,8 @@ public class PaymentCompletedEvent {
 
     private UUID orderId;
     private UUID paymentId;
-    private UUID storeId;
-    private String customerUsername;
+    private UUID companyId;
+    private String userUsername;
     private String deliveryAddress;
     private Integer totalPrice;
     private LocalDateTime occurredAt;

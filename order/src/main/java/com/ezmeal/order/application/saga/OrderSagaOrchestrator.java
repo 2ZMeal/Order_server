@@ -1,9 +1,9 @@
 package com.ezmeal.order.application.saga;
 
-import com.delivery.orderservice.domain.entity.Order;
-import com.delivery.orderservice.domain.event.*;
-import com.delivery.orderservice.domain.repository.OrderRepository;
-import com.delivery.orderservice.infrastructure.kafka.OrderEventPublisher;
+import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.domain.event.*;
+import com.ezmeal.order.domain.repository.OrderRepository;
+import com.ezmeal.order.infrastructure.kafka.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -60,8 +60,8 @@ public class OrderSagaOrchestrator {
         // payment-service로 결제 요청 이벤트 발행
         OrderCreatedEvent event = OrderCreatedEvent.builder()
                 .orderId(order.getId())
-                .storeId(order.getStoreId())
-                .customerUsername(order.getCustomerUsername())
+                .companyId(order.getCompanyId())
+                .userUsername(order.getUserUsername())
                 .totalPrice(order.getTotalPrice())
                 .deliveryAddress(order.getDeliveryAddress())
                 .items(order.getOrderItems().stream()
@@ -105,8 +105,8 @@ public class OrderSagaOrchestrator {
         // shipment-service로 배달 요청 이벤트 발행
         ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
                 .orderId(order.getId())
-                .storeId(order.getStoreId())
-                .customerUsername(order.getCustomerUsername())
+                .companyId(order.getCompanyId())
+                .userUsername(order.getUserUsername())
                 .deliveryAddress(order.getDeliveryAddress())
                 .requestNote(order.getRequestNote())
                 .occurredAt(LocalDateTime.now())
@@ -169,8 +169,8 @@ public class OrderSagaOrchestrator {
         // payment-service / shipment-service로 취소 이벤트 발행
         OrderCancelledEvent cancelledEvent = OrderCancelledEvent.builder()
                 .orderId(order.getId())
-                .storeId(order.getStoreId())
-                .customerUsername(order.getCustomerUsername())
+                .companyId(order.getCompanyId())
+                .userUsername(order.getUserUsername())
                 .cancelledBy(cancelledBy)
                 .requiresPaymentCancellation(needsPaymentCancel)
                 .requiresShipmentCancellation(needsShipmentCancel)
@@ -186,11 +186,11 @@ public class OrderSagaOrchestrator {
     }
 
     // ================================================================
-    // 상태 변경 (OWNER/MANAGER) → 알림 + 완료 시 리뷰 요청
+    // 상태 변경 (COMPANY) → 알림 + 완료 시 리뷰 요청
     // ================================================================
 
     /**
-     * OWNER/MANAGER의 주문 상태 변경 후 호출
+     * COMPANY의 주문 상태 변경 후 호출
      * → notification-service: 상태 변경 알림 (항상 발행)
      * → notification-service: 리뷰 요청 알림 (COMPLETED 상태일 때만 추가 발행)
      * → shipment 완료 처리: SAGA 완료 마킹
@@ -225,8 +225,8 @@ public class OrderSagaOrchestrator {
                                            String changedBy) {
         OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
                 .orderId(order.getId())
-                .customerUsername(order.getCustomerUsername())
-                .storeId(order.getStoreId())
+                .userUsername(order.getUserUsername())
+                .companyId(order.getCompanyId())
                 .previousStatus(prevStatus.name())
                 .currentStatus(currentStatus.name())
                 .changedBy(changedBy)
@@ -241,8 +241,8 @@ public class OrderSagaOrchestrator {
     private void publishOrderCompletedEvent(Order order) {
         OrderCompletedEvent event = OrderCompletedEvent.builder()
                 .orderId(order.getId())
-                .storeId(order.getStoreId())
-                .customerUsername(order.getCustomerUsername())
+                .companyId(order.getCompanyId())
+                .userUsername(order.getUserUsername())
                 .productNames(order.getOrderItems().stream()
                         .map(item -> item.getProductName())
                         .toList())

@@ -4,8 +4,8 @@ import lombok.Getter;
 import java.util.UUID;
 
 @Getter
-public class StoreInfo {
-    private UUID storeId;
+public class CompanyInfo {
+    private UUID companyId;
     private String name;
-    private String ownerUsername;
+    private String companyUsername;
 }

@@ -1,16 +1,16 @@
 package com.ezmeal.order.application.service;
 
-import com.delivery.orderservice.application.dto.request.OrderRequestDto;
-import com.delivery.orderservice.application.dto.request.OrderSearchRequestDto;
-import com.delivery.orderservice.application.dto.response.OrderResponseDto;
-import com.delivery.orderservice.application.saga.OrderSagaOrchestrator;
-import com.delivery.orderservice.domain.entity.Order;
-import com.delivery.orderservice.domain.entity.OrderItem;
-import com.delivery.orderservice.domain.repository.OrderRepository;
-import com.delivery.orderservice.infrastructure.client.StoreClient;
-import com.delivery.orderservice.infrastructure.client.dto.StoreInfo;
-import com.delivery.orderservice.infrastructure.client.dto.ProductInfo;
-import com.delivery.orderservice.infrastructure.client.ProductClient;
+import com.ezmeal.order.application.dto.request.OrderRequestDto;
+import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
+import com.ezmeal.order.application.dto.response.OrderResponseDto;
+import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
+import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.domain.entity.OrderItem;
+import com.ezmeal.order.domain.repository.OrderRepository;
+import com.ezmeal.order.infrastructure.client.CompanyClient;
+import com.ezmeal.order.infrastructure.client.dto.CompanyInfo;
+import com.ezmeal.order.infrastructure.client.dto.ProductInfo;
+import com.ezmeal.order.infrastructure.client.ProductClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,52 +32,52 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderSagaOrchestrator sagaOrchestrator;
-    private final StoreClient storeClient;
+    private final CompanyClient companyClient;
     private final ProductClient productClient;
 
     // ========================
     // 조회
     // ========================
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OWNER', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
     public Page<OrderResponseDto> selectOrders(String username, List<String> roles, Pageable pageable) {
         Page<Order> page;
-        if (roles.contains("ROLE_ADMIN") || roles.contains("ROLE_MANAGER")) {
+        if (roles.contains("ROLE_ADMIN")) {
             page = orderRepository.findAll(pageable);
-        } else if (roles.contains("ROLE_OWNER")) {
-            StoreInfo store = storeClient.getStoreByOwner(username);
-            page = orderRepository.findByStoreId(store.getStoreId(), pageable);
+        } else if (roles.contains("ROLE_COMPANY")) {
+            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            page = orderRepository.findByCompanyId(company.getCompanyId(), pageable);
         } else {
-            page = orderRepository.findByCustomerUsername(username, pageable);
+            page = orderRepository.findByUserUsername(username, pageable);
         }
         return page.map(OrderResponseDto::from);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OWNER', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
     public Page<OrderResponseDto> selectOrdersSearch(
             OrderSearchRequestDto dto, String username, List<String> roles, Pageable pageable) {
 
-        UUID storeId = null;
-        String customerUsername = null;
+        UUID companyId = null;
+        String userUsername = null;
 
-        if (roles.contains("ROLE_ADMIN") || roles.contains("ROLE_MANAGER")) {
+        if (roles.contains("ROLE_ADMIN")) {
             // 관리자: DTO의 조건 그대로 사용
-            storeId = dto.getStoreId();
-            customerUsername = dto.getCustomerUsername();
-        } else if (roles.contains("ROLE_OWNER")) {
+            companyId = dto.getCompanyId();
+            userUsername = dto.getUserUsername();
+        } else if (roles.contains("ROLE_COMPANY")) {
             // 사장님: 본인 가게 ID로 고정
-            StoreInfo store = storeClient.getStoreByOwner(username);
-            storeId = store.getStoreId();
+            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            companyId = company.getCompanyId();
         } else {
             // 고객: 본인 username으로 고정
-            customerUsername = username;
+            userUsername = username;
         }
 
         Order.OrderStatus status = (dto.getStatus() != null)
                 ? Order.OrderStatus.valueOf(dto.getStatus()) : null;
 
         return orderRepository.searchWithFilters(
-                storeId, customerUsername, status,
+                companyId, userUsername, status,
                 dto.getProductName(), dto.getMinAmount(), dto.getMaxAmount(), pageable
         ).map(OrderResponseDto::from);
     }
@@ -91,10 +91,10 @@ public class OrderService {
     // ========================
 
     @Transactional
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CUSTOMER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public OrderResponseDto createOrder(String username, OrderRequestDto dto) {
-        // 1. 가게 정보 조회 (store-service FeignClient)
-        StoreInfo store = storeClient.getStoreByName(dto.getStoreName());
+        // 1. 가게 정보 조회 (company-service FeignClient)
+        CompanyInfo company = companyClient.getCompanyByName(dto.getCompanyName());
 
         // 2. 상품 정보 조회 (product-service FeignClient)
         List<String> productNames = dto.getProducts().stream()
@@ -118,7 +118,7 @@ public class OrderService {
         // 4. Order 엔티티 생성
         Order order = Order.create(
                 username,
-                store.getStoreId(),
+                company.getCompanyId(),
                 dto.getAddress(),
                 totalPrice,
                 dto.getComment(),
@@ -147,13 +147,13 @@ public class OrderService {
     // ========================
 
     @Transactional
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'CUSTOMER', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'COMPANY')")
     public OrderResponseDto cancelOrder(UUID orderId, String username, List<String> roles) {
         Order order = findOrder(orderId);
 
         // 고객 본인 주문인지 확인 (관리자는 예외)
-        boolean isAdmin = roles.contains("ROLE_ADMIN") || roles.contains("ROLE_MANAGER");
-        if (!isAdmin && !order.getCustomerUsername().equals(username)) {
+        boolean isAdmin = roles.contains("ROLE_ADMIN");
+        if (!isAdmin && !order.getUserUsername().equals(username)) {
             throw new IllegalArgumentException("본인의 주문만 취소할 수 있습니다.");
         }
 
@@ -176,20 +176,20 @@ public class OrderService {
     }
 
     // ========================
-    // 주문 상태 변경 (OWNER/MANAGER)
+    // 주문 상태 변경 (COMPANY)
     // ========================
 
     @Transactional
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OWNER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY')")
     public OrderResponseDto updateOrderStatus(UUID orderId, Order.OrderStatus newStatus,
                                               String username, List<String> roles) {
         Order order = findOrder(orderId);
 
-        // OWNER는 본인 가게 주문만 변경 가능
-        boolean isStaff = roles.contains("ROLE_ADMIN") || roles.contains("ROLE_MANAGER");
+        // COMPANY는 본인 가게 주문만 변경 가능
+        boolean isStaff = roles.contains("ROLE_ADMIN");
         if (!isStaff) {
-            StoreInfo store = storeClient.getStoreByOwner(username);
-            if (!order.getStoreId().equals(store.getStoreId())) {
+            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            if (!order.getCompanyId().equals(company.getCompanyId())) {
                 throw new IllegalArgumentException("본인 가게의 주문만 상태를 변경할 수 있습니다.");
             }
         }

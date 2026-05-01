@@ -1,7 +1,7 @@
 package com.ezmeal.order.application.dto.response;
 
-import com.delivery.orderservice.domain.entity.Order;
-import com.delivery.orderservice.domain.entity.OrderItem;
+import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.domain.entity.OrderItem;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -15,8 +15,8 @@ import java.util.stream.Collectors;
 public class OrderResponseDto {
 
     private UUID orderId;
-    private String customerUsername;
-    private UUID storeId;
+    private String userUsername;
+    private UUID companyId;
     private String deliveryAddress;
     private String status;
     private String sagaStatus;
@@ -30,8 +30,8 @@ public class OrderResponseDto {
     public static OrderResponseDto from(Order order) {
         return OrderResponseDto.builder()
                 .orderId(order.getId())
-                .customerUsername(order.getCustomerUsername())
-                .storeId(order.getStoreId())
+                .userUsername(order.getUserUsername())
+                .companyId(order.getCompanyId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .status(order.getStatus().name())
                 .sagaStatus(order.getSagaStatus() != null ? order.getSagaStatus().name() : null)

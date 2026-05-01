@@ -22,8 +22,8 @@ import java.util.UUID;
 public class OrderStatusChangedEvent {
 
     private UUID orderId;
-    private String customerUsername;
-    private UUID storeId;
+    private String userUsername;
+    private UUID companyId;
     private String previousStatus;
     private String currentStatus;
     private String changedBy;

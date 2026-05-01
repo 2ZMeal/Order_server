@@ -1,4 +1,4 @@
-package com.delivery.orderservice.infrastructure.kafka.dto;
+package com.ezmeal.order.infrastructure.kafka.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +14,7 @@ import java.util.UUID;
 public class PaymentResultMessage {
     private UUID orderId;
     private UUID paymentId;
-    private String customerUsername;
+    private String userUsername;
     private boolean success;
     private String reason;     // 실패 시 사유
 }

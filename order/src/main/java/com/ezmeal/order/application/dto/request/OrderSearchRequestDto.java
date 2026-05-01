@@ -1,12 +1,12 @@
-package com.delivery.orderservice.application.dto.request;
+package com.ezmeal.order.application.dto.request;
 
 import lombok.Getter;
 import java.util.UUID;
 
 @Getter
 public class OrderSearchRequestDto {
-    private UUID storeId;
-    private String customerUsername;
+    private UUID companyId;
+    private String userUsername;
     private String status;
     private String productName;
     private Integer minAmount;
