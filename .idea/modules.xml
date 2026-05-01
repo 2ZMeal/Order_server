@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Order_server.iml" filepath="$PROJECT_DIR$/.idea/Order_server.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.ezmeal.order.main.iml" filepath="$PROJECT_DIR$/.idea/modules/com.ezmeal.order.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/order/order.iml" filepath="$PROJECT_DIR$/order/order.iml" />
     </modules>
   </component>
