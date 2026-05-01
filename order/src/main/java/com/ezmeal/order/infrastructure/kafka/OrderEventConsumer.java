@@ -2,6 +2,7 @@ package com.ezmeal.order.infrastructure.kafka;
 
 import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
 import com.ezmeal.order.infrastructure.kafka.dto.PaymentResultMessage;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +45,7 @@ public class OrderEventConsumer {
                 sagaOrchestrator.onPaymentCompleted(
                         result.getOrderId(),
                         result.getPaymentId(),
-                        result.getUserUsername()
+                        result.getUserName()
                 );
             } else {
                 sagaOrchestrator.onPaymentFailed(

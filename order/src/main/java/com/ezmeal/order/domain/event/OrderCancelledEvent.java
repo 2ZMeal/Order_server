@@ -18,7 +18,7 @@ public class OrderCancelledEvent {
 
     private UUID orderId;
     private UUID companyId;
-    private String userUsername;
+    private String userName;
     private String cancelledBy;
 
     /**

@@ -20,7 +20,7 @@ public class OrderCompletedEvent {
     private UUID orderId;
     private UUID companyId;
     private String companyName;
-    private String userUsername;
+    private String userName;
     private List<String> productNames;   // 리뷰 대상 상품 목록
     private Integer totalPrice;
     private LocalDateTime completedAt;

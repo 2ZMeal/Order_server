@@ -7,5 +7,5 @@ import java.util.UUID;
 public class CompanyInfo {
     private UUID companyId;
     private String name;
-    private String companyUsername;
+    private String companyUserName;
 }

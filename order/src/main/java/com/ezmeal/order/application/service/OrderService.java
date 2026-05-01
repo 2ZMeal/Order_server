@@ -39,45 +39,44 @@ public class OrderService {
     // 조회
     // ========================
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
-    public Page<OrderResponseDto> selectOrders(String username, List<String> roles, Pageable pageable) {
+    public Page<OrderResponseDto> selectOrders(String userName, List<String> roles, Pageable pageable) {
         Page<Order> page;
         if (roles.contains("ROLE_ADMIN")) {
             page = orderRepository.findAll(pageable);
         } else if (roles.contains("ROLE_COMPANY")) {
-            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            CompanyInfo company = companyClient.getCompanyByCompany(userName);
             page = orderRepository.findByCompanyId(company.getCompanyId(), pageable);
         } else {
-            page = orderRepository.findByUserUsername(username, pageable);
+            page = orderRepository.findByUserName(userName, pageable);
         }
         return page.map(OrderResponseDto::from);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
     public Page<OrderResponseDto> selectOrdersSearch(
-            OrderSearchRequestDto dto, String username, List<String> roles, Pageable pageable) {
+            OrderSearchRequestDto dto, String userName, List<String> roles, Pageable pageable) {
 
         UUID companyId = null;
-        String userUsername = null;
+        String customerUsername = null;
 
         if (roles.contains("ROLE_ADMIN")) {
             // 관리자: DTO의 조건 그대로 사용
             companyId = dto.getCompanyId();
-            userUsername = dto.getUserUsername();
+            customerUsername = dto.getUserName();
         } else if (roles.contains("ROLE_COMPANY")) {
             // 사장님: 본인 가게 ID로 고정
-            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            CompanyInfo company = companyClient.getCompanyByCompany(userName);
             companyId = company.getCompanyId();
         } else {
-            // 고객: 본인 username으로 고정
-            userUsername = username;
+            // 고객: 본인 userName으로 고정
+            customerUsername = userName;
         }
 
         Order.OrderStatus status = (dto.getStatus() != null)
                 ? Order.OrderStatus.valueOf(dto.getStatus()) : null;
 
         return orderRepository.searchWithFilters(
-                companyId, userUsername, status,
+                companyId, customerUsername, status,
                 dto.getProductName(), dto.getMinAmount(), dto.getMaxAmount(), pageable
         ).map(OrderResponseDto::from);
     }
@@ -92,7 +91,7 @@ public class OrderService {
 
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public OrderResponseDto createOrder(String username, OrderRequestDto dto) {
+    public OrderResponseDto createOrder(String userName, OrderRequestDto dto) {
         // 1. 가게 정보 조회 (company-service FeignClient)
         CompanyInfo company = companyClient.getCompanyByName(dto.getCompanyName());
 
@@ -117,7 +116,7 @@ public class OrderService {
 
         // 4. Order 엔티티 생성
         Order order = Order.create(
-                username,
+                userName,
                 company.getCompanyId(),
                 dto.getAddress(),
                 totalPrice,
@@ -129,7 +128,7 @@ public class OrderService {
         dto.getProducts().forEach(item -> {
             ProductInfo p = productMap.get(item.getProductName());
             order.getOrderItems().add(
-                    OrderItem.create(order, p.getName(), p.getPrice(), item.getQuantity(), username)
+                    OrderItem.create(order, p.getName(), p.getPrice(), item.getQuantity(), userName)
             );
         });
 
@@ -138,7 +137,7 @@ public class OrderService {
         // 6. SAGA 시작 (결제 요청 이벤트 발행)
         sagaOrchestrator.onOrderCreated(savedOrder);
 
-        log.info("[OrderService] 주문 생성 완료 - orderId={}, username={}", savedOrder.getId(), username);
+        log.info("[OrderService] 주문 생성 완료 - orderId={}, userName={}", savedOrder.getId(), userName);
         return OrderResponseDto.from(savedOrder);
     }
 
@@ -148,12 +147,12 @@ public class OrderService {
 
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'COMPANY')")
-    public OrderResponseDto cancelOrder(UUID orderId, String username, List<String> roles) {
+    public OrderResponseDto cancelOrder(UUID orderId, String userName, List<String> roles) {
         Order order = findOrder(orderId);
 
         // 고객 본인 주문인지 확인 (관리자는 예외)
         boolean isAdmin = roles.contains("ROLE_ADMIN");
-        if (!isAdmin && !order.getUserUsername().equals(username)) {
+        if (!isAdmin && !order.getUserName().equals(userName)) {
             throw new IllegalArgumentException("본인의 주문만 취소할 수 있습니다.");
         }
 
@@ -165,11 +164,11 @@ public class OrderService {
         Order.OrderStatus prevStatus = order.getStatus();
 
         // 도메인 취소 처리 (상태 검증 포함 - DELIVERING 이후는 불가)
-        order.cancel(username);
+        order.cancel(userName);
         orderRepository.save(order);
 
         // SAGA: 결제 취소 + 배달 취소 + 취소 알림 이벤트 발행
-        sagaOrchestrator.onOrderCancelled(order, prevStatus, username);
+        sagaOrchestrator.onOrderCancelled(order, prevStatus, userName);
 
         log.info("[OrderService] 주문 취소 완료 - orderId={}, prevStatus={}", orderId, prevStatus);
         return OrderResponseDto.from(order);
@@ -182,13 +181,13 @@ public class OrderService {
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY')")
     public OrderResponseDto updateOrderStatus(UUID orderId, Order.OrderStatus newStatus,
-                                              String username, List<String> roles) {
+                                              String userName, List<String> roles) {
         Order order = findOrder(orderId);
 
         // COMPANY는 본인 가게 주문만 변경 가능
         boolean isStaff = roles.contains("ROLE_ADMIN");
         if (!isStaff) {
-            CompanyInfo company = companyClient.getCompanyByCompany(username);
+            CompanyInfo company = companyClient.getCompanyByCompany(userName);
             if (!order.getCompanyId().equals(company.getCompanyId())) {
                 throw new IllegalArgumentException("본인 가게의 주문만 상태를 변경할 수 있습니다.");
             }
@@ -197,11 +196,11 @@ public class OrderService {
         Order.OrderStatus prevStatus = order.getStatus();
 
         // 도메인 상태 변경 (전이 규칙 검증 포함)
-        order.updateStatus(newStatus, username);
+        order.updateStatus(newStatus, userName);
         orderRepository.save(order);
 
         // SAGA: 상태 알림 + COMPLETED 시 리뷰 요청 이벤트 발행
-        sagaOrchestrator.onOrderStatusUpdated(order, prevStatus, username);
+        sagaOrchestrator.onOrderStatusUpdated(order, prevStatus, userName);
 
         log.info("[OrderService] 주문 상태 변경 - orderId={}, {} → {}", orderId, prevStatus, newStatus);
         return OrderResponseDto.from(order);

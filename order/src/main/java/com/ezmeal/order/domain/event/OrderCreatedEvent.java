@@ -17,7 +17,7 @@ public class OrderCreatedEvent {
 
     private UUID orderId;
     private UUID companyId;
-    private String userUsername;
+    private String userName;
     private Integer totalPrice;
     private String deliveryAddress;
     private List<OrderItemPayload> items;

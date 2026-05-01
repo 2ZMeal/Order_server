@@ -22,8 +22,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "user_username", nullable = false, length = 100)
-    private String userUsername;
+    @Column(name = "user_name", nullable = false, length = 100)
+    private String userName;
 
     @Column(name = "company_id", nullable = false)
     private UUID companyId;
@@ -101,11 +101,11 @@ public class Order {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String userUsername, UUID companyId,
+    public static Order create(String userName, UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote, OrderType orderType) {
         return Order.builder()
-                .userUsername(userUsername)
+                .userName(userName)
                 .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)
@@ -114,7 +114,7 @@ public class Order {
                 .status(OrderStatus.READY)
                 .sagaStatus(SagaStatus.ORDER_CREATED)
                 .createdAt(LocalDateTime.now())
-                .createdBy(userUsername)
+                .createdBy(userName)
                 .build();
     }
 

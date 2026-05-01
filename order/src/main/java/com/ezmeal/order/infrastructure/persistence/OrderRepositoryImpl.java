@@ -36,8 +36,8 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Page<Order> findByUserUsername(String username, Pageable pageable) {
-        return jpaRepository.findByUserUsername(username, pageable);
+    public Page<Order> findByUserName(String userName, Pageable pageable) {
+        return jpaRepository.findByUserName(userName, pageable);
     }
 
     @Override
@@ -46,10 +46,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Page<Order> searchWithFilters(UUID companyId, String userUsername,
+    public Page<Order> searchWithFilters(UUID companyId, String userName,
                                          Order.OrderStatus status, String productName,
                                          Integer minAmount, Integer maxAmount, Pageable pageable) {
         return jpaRepository.searchWithFilters(
-                companyId, userUsername, status, productName, minAmount, maxAmount, pageable);
+                companyId, userName, status, productName, minAmount, maxAmount, pageable);
     }
 }

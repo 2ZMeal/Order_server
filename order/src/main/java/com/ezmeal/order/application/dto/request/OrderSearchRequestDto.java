@@ -6,7 +6,7 @@ import java.util.UUID;
 @Getter
 public class OrderSearchRequestDto {
     private UUID companyId;
-    private String userUsername;
+    private String userName;
     private String status;
     private String productName;
     private Integer minAmount;

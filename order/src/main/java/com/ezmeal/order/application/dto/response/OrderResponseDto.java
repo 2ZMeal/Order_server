@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class OrderResponseDto {
 
     private UUID orderId;
-    private String userUsername;
+    private String userName;
     private UUID companyId;
     private String deliveryAddress;
     private String status;
@@ -30,7 +30,7 @@ public class OrderResponseDto {
     public static OrderResponseDto from(Order order) {
         return OrderResponseDto.builder()
                 .orderId(order.getId())
-                .userUsername(order.getUserUsername())
+                .userName(order.getUserName())
                 .companyId(order.getCompanyId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .status(order.getStatus().name())

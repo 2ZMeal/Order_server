@@ -14,7 +14,7 @@ import java.util.UUID;
 public class PaymentResultMessage {
     private UUID orderId;
     private UUID paymentId;
-    private String userUsername;
+    private String userName;
     private boolean success;
     private String reason;     // 실패 시 사유
 }
