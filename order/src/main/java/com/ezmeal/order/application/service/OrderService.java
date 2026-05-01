@@ -48,7 +48,7 @@ public class OrderService {
             CompanyInfo company = companyClient.getCompanyByCompany(username);
             page = orderRepository.findByCompanyId(company.getCompanyId(), pageable);
         } else {
-            page = orderRepository.findByUserUsername(username, pageable);
+            page = orderRepository.findByUserName(username, pageable);
         }
         return page.map(OrderResponseDto::from);
     }
@@ -63,7 +63,7 @@ public class OrderService {
         if (roles.contains("ROLE_ADMIN")) {
             // 관리자: DTO의 조건 그대로 사용
             companyId = dto.getCompanyId();
-            userUsername = dto.getUserUsername();
+            userUsername = dto.getUserName();
         } else if (roles.contains("ROLE_COMPANY")) {
             // 사장님: 본인 가게 ID로 고정
             CompanyInfo company = companyClient.getCompanyByCompany(username);
@@ -153,7 +153,7 @@ public class OrderService {
 
         // 고객 본인 주문인지 확인 (관리자는 예외)
         boolean isAdmin = roles.contains("ROLE_ADMIN");
-        if (!isAdmin && !order.getUserUsername().equals(username)) {
+        if (!isAdmin && !order.getUserName().equals(username)) {
             throw new IllegalArgumentException("본인의 주문만 취소할 수 있습니다.");
         }
 

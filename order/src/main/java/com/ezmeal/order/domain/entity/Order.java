@@ -23,7 +23,7 @@ public class Order {
     private UUID id;
 
     @Column(name = "user_username", nullable = false, length = 100)
-    private String userUsername;
+    private String userName;
 
     @Column(name = "company_id", nullable = false)
     private UUID companyId;

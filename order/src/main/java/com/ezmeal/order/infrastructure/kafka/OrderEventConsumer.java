@@ -44,7 +44,7 @@ public class OrderEventConsumer {
                 sagaOrchestrator.onPaymentCompleted(
                         result.getOrderId(),
                         result.getPaymentId(),
-                        result.getUserUsername()
+                        result.getUserName()
                 );
             } else {
                 sagaOrchestrator.onPaymentFailed(

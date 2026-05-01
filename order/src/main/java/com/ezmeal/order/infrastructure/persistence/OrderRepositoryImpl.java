@@ -36,8 +36,8 @@ public class OrderRepositoryImpl implements OrderRepository {
     }
 
     @Override
-    public Page<Order> findByUserUsername(String username, Pageable pageable) {
-        return jpaRepository.findByUserUsername(username, pageable);
+    public Page<Order> findByUserName(String username, Pageable pageable) {
+        return jpaRepository.findByUserName(username, pageable);
     }
 
     @Override
