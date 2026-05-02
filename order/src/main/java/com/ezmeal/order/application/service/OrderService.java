@@ -39,6 +39,7 @@ public class OrderService {
     // 조회
     // ========================
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
     public Page<OrderResponseDto> selectOrders(String userName, List<String> roles, Pageable pageable) {
         Page<Order> page;
         if (roles.contains("ROLE_ADMIN")) {
