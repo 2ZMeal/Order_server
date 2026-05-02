@@ -106,7 +106,7 @@ public class OrderSagaOrchestrator {
         ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
                 .orderId(order.getId())
                 .companyId(order.getCompanyId())
-                .UserName(order.getUserName())
+                .userName(order.getUserName())
                 .deliveryAddress(order.getDeliveryAddress())
                 .requestNote(order.getRequestNote())
                 .occurredAt(LocalDateTime.now())

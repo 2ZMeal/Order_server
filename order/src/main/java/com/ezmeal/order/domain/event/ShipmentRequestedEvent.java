@@ -18,7 +18,7 @@ public class ShipmentRequestedEvent {
 
     private UUID orderId;
     private UUID companyId;
-    private String UserName;
+    private String userName;
     private String deliveryAddress;
     private String requestNote;
     private LocalDateTime occurredAt;
