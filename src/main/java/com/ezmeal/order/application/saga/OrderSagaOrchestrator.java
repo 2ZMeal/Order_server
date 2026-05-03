@@ -1,7 +1,9 @@
 package com.ezmeal.order.application.saga;
 
+import com.ezmeal.common.exception.CustomException;
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.event.*;
+import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
 import com.ezmeal.order.infrastructure.kafka.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
@@ -92,14 +94,14 @@ public class OrderSagaOrchestrator {
      * 호출 위치: OrderEventConsumer.consumePaymentResult()
      */
     @Transactional
-    public void onPaymentCompleted(UUID orderId, UUID paymentId, String updatedBy) {
+    public void onPaymentCompleted(UUID orderId, UUID paymentId) {
         log.info("[SAGA][STEP2] 결제 완료, 배달 요청 발행 - orderId={}, paymentId={}", orderId, paymentId);
 
         Order order = findOrder(orderId);
         Order.OrderStatus prevStatus = order.getStatus();
 
         // Order 상태 CONFIRMED 처리
-        order.markPaymentCompleted(updatedBy);
+        order.markPaymentCompleted();
         orderRepository.save(order);
 
         // shipment-service로 배달 요청 이벤트 발행
@@ -114,7 +116,7 @@ public class OrderSagaOrchestrator {
         eventPublisher.publishShipmentRequested(shipmentEvent);
 
         // notification-service: 결제 완료(CONFIRMED) 상태 변경 알림
-        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED, updatedBy);
+        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED);
 
         log.info("[SAGA][STEP2] 완료 - orderId={}, status=CONFIRMED", orderId);
     }
@@ -137,12 +139,12 @@ public class OrderSagaOrchestrator {
         Order.OrderStatus prevStatus = order.getStatus();
 
         // Order CANCELLED 처리 (보상)
-        order.markPaymentFailed("system");
+        order.markPaymentFailed();
         order.markSagaCompensated();
         orderRepository.save(order);
 
         // notification-service: 결제 실패로 인한 취소 알림
-        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED, "system");
+        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED);
 
         log.warn("[SAGA][COMPENSATE] 완료 - orderId={}, status=CANCELLED", orderId);
     }
@@ -179,7 +181,7 @@ public class OrderSagaOrchestrator {
         eventPublisher.publishOrderCancelled(cancelledEvent);
 
         // notification-service: 취소 알림
-        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED, cancelledBy);
+        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED);
 
         log.info("[SAGA][CANCEL] 완료 - orderId={}, paymentCancel={}, shipmentCancel={}",
                 order.getId(), needsPaymentCancel, needsShipmentCancel);
@@ -197,12 +199,12 @@ public class OrderSagaOrchestrator {
      * 호출 위치: OrderService.updateOrderStatus()
      */
     @Transactional
-    public void onOrderStatusUpdated(Order order, Order.OrderStatus prevStatus, String updatedBy) {
+    public void onOrderStatusUpdated(Order order, Order.OrderStatus prevStatus) {
         log.info("[SAGA] 주문 상태 변경 - orderId={}, {} → {}",
                 order.getId(), prevStatus, order.getStatus());
 
         // notification-service: 상태 변경 알림 (모든 상태 변경 시)
-        publishStatusChangedEvent(order, prevStatus, order.getStatus(), updatedBy);
+        publishStatusChangedEvent(order, prevStatus, order.getStatus());
 
         // COMPLETED 상태가 되면 SAGA 완료 마킹 + 리뷰 요청 이벤트 발행
         if (order.getStatus() == Order.OrderStatus.COMPLETED) {
@@ -221,15 +223,13 @@ public class OrderSagaOrchestrator {
      */
     private void publishStatusChangedEvent(Order order,
                                            Order.OrderStatus prevStatus,
-                                           Order.OrderStatus currentStatus,
-                                           String changedBy) {
+                                           Order.OrderStatus currentStatus) {
         OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
                 .orderId(order.getId())
                 .userName(order.getUserName())
                 .companyId(order.getCompanyId())
                 .previousStatus(prevStatus.name())
                 .currentStatus(currentStatus.name())
-                .changedBy(changedBy)
                 .occurredAt(LocalDateTime.now())
                 .build();
         eventPublisher.publishOrderStatusChanged(event);
@@ -255,6 +255,6 @@ public class OrderSagaOrchestrator {
 
     private Order findOrder(UUID orderId) {
         return orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("주문 없음: " + orderId));
+                .orElseThrow(() -> new CustomException(OrderErrorCode.ORDER_NOT_FOUND));
     }
 }

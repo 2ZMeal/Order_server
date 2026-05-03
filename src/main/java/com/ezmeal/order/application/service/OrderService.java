@@ -1,5 +1,6 @@
 package com.ezmeal.order.application.service;
 
+import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.order.application.dto.request.OrderRequestDto;
 import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
 import com.ezmeal.order.application.dto.response.OrderResponseDto;
@@ -39,17 +40,16 @@ public class OrderService {
     // 조회
     // ========================
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
-    public Page<OrderResponseDto> selectOrders(String userName, List<String> roles, Pageable pageable) {
-        Page<Order> page;
-        if (roles.contains("ROLE_ADMIN")) {
-            page = orderRepository.findAll(pageable);
-        } else if (roles.contains("ROLE_COMPANY")) {
-            CompanyInfo company = companyClient.getCompanyByCompany(userName);
-            page = orderRepository.findByCompanyId(company.getCompanyId(), pageable);
-        } else {
-            page = orderRepository.findByUserName(userName, pageable);
-        }
+    public Page<OrderResponseDto> selectOrders(CustomUserPrincipal principal, Pageable pageable) {
+        Page<Order> page = switch (principal.getRole()) {   // Role enum switch 로 교체
+            case ADMIN   -> orderRepository.findAll(pageable);
+
+            case COMPANY -> {                               // ROLE_OWNER + ROLE_MANAGER → COMPANY
+                CompanyInfo company = companyClient.getCompanyByCompany(principal.getUserId());
+                yield orderRepository.findByCompanyId(company.getCompanyId(), pageable);
+            }
+            case USER    -> orderRepository.findByCustomerId(principal.getUserId(), pageable);  // ROLE_CUSTOMER → USER
+        };
         return page.map(OrderResponseDto::from);
     }
 
@@ -197,11 +197,11 @@ public class OrderService {
         Order.OrderStatus prevStatus = order.getStatus();
 
         // 도메인 상태 변경 (전이 규칙 검증 포함)
-        order.updateStatus(newStatus, userName);
+        order.updateStatus(newStatus);
         orderRepository.save(order);
 
         // SAGA: 상태 알림 + COMPLETED 시 리뷰 요청 이벤트 발행
-        sagaOrchestrator.onOrderStatusUpdated(order, prevStatus, userName);
+        sagaOrchestrator.onOrderStatusUpdated(order, prevStatus);
 
         log.info("[OrderService] 주문 상태 변경 - orderId={}, {} → {}", orderId, prevStatus, newStatus);
         return OrderResponseDto.from(order);

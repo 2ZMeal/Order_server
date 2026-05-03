@@ -33,7 +33,7 @@ ext {
 dependencies {
 
     // 공통 모듈
-    implementation 'com.ezmeal:common:0.0.1'
+    implementation 'com.ezmeal:common:0.0.5'
 
 //    // 롬복을 사용하기 위해 하단 두 줄 추가
 //    compileOnly 'org.projectlombok:lombok'

@@ -1,5 +1,8 @@
 package com.ezmeal.order.domain.entity;
 
+import com.ezmeal.common.entity.BaseEntity;
+import com.ezmeal.common.exception.CustomException;
+import com.ezmeal.order.domain.exception.OrderErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
@@ -16,11 +19,14 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @SQLRestriction("deleted_at IS NULL")
-public class Order {
+public class Order extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "customer_id", nullable = false, length = 100)
+    private String customerId;            // customerUsername → customerId
 
     @Column(name = "user_name", nullable = false, length = 100)
     private String userName;
@@ -53,23 +59,7 @@ public class Order {
     @Builder.Default
     private List<OrderItem> orderItems = new ArrayList<>();
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
-    @Column(name = "created_by", length = 100, nullable = false)
-    private String createdBy;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "updated_by", length = 100)
-    private String updatedBy;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @Column(name = "deleted_by", length = 100)
-    private String deletedBy;
 
     // ========================
     // Enum 정의
@@ -101,11 +91,11 @@ public class Order {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String userName, UUID companyId,
+    public static Order create(String customerId, UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote, OrderType orderType) {
         return Order.builder()
-                .userName(userName)
+                .customerId(customerId)
                 .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)
@@ -113,8 +103,6 @@ public class Order {
                 .orderType(orderType)
                 .status(OrderStatus.READY)
                 .sagaStatus(SagaStatus.ORDER_CREATED)
-                .createdAt(LocalDateTime.now())
-                .createdBy(userName)
                 .build();
     }
 
@@ -126,37 +114,29 @@ public class Order {
     public void markPaymentRequested() {
         this.status = OrderStatus.PENDING;
         this.sagaStatus = SagaStatus.PAYMENT_REQUESTED;
-        this.updatedAt = LocalDateTime.now();
     }
 
     /** 결제 완료 → 주문 확정 */
-    public void markPaymentCompleted(String updatedBy) {
+    public void markPaymentCompleted() {
         this.status = OrderStatus.CONFIRMED;
         this.sagaStatus = SagaStatus.PAYMENT_COMPLETED;
-        this.updatedBy = updatedBy;
-        this.updatedAt = LocalDateTime.now();
     }
 
     /** 결제 실패 → 주문 취소 (보상) */
-    public void markPaymentFailed(String updatedBy) {
+    public void markPaymentFailed() {
         this.status = OrderStatus.CANCELLED;
         this.sagaStatus = SagaStatus.PAYMENT_FAILED;
-        this.updatedBy = updatedBy;
-        this.updatedAt = LocalDateTime.now();
-        this.deletedAt = LocalDateTime.now();
-        this.deletedBy = updatedBy;
+        super.deleteBySystem();                 // BaseEntity 위임 (deletedAt/By 자동)
     }
 
     /** SAGA 전체 완료 */
     public void markSagaCompleted() {
         this.sagaStatus = SagaStatus.SAGA_COMPLETED;
-        this.updatedAt = LocalDateTime.now();
     }
 
     /** SAGA 보상 완료 */
     public void markSagaCompensated() {
         this.sagaStatus = SagaStatus.SAGA_COMPENSATED;
-        this.updatedAt = LocalDateTime.now();
     }
 
     // ========================
@@ -170,21 +150,17 @@ public class Order {
      */
     public void cancel(String cancelledBy) {
         if (this.status == OrderStatus.CANCELLED) {
-            throw new IllegalStateException("이미 취소된 주문입니다.");
+            throw new CustomException(OrderErrorCode.ORDER_ALREADY_CANCELLED);
         }
         if (this.status == OrderStatus.DELIVERING) {
-            throw new IllegalStateException("배달 중인 주문은 취소할 수 없습니다.");
+            throw new CustomException(OrderErrorCode.ORDER_CANCEL_DELIVERING);
         }
         if (this.status == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("이미 완료된 주문은 취소할 수 없습니다.");
+            throw new CustomException(OrderErrorCode.ORDER_CANCEL_COMPLETED);
         }
-
         this.status = OrderStatus.CANCELLED;
         this.sagaStatus = SagaStatus.SAGA_COMPENSATED;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = cancelledBy;
-        this.deletedAt = LocalDateTime.now();
-        this.deletedBy = cancelledBy;
+        super.delete(cancelledBy);   // BaseEntity 위임 (updatedAt/By + deletedAt/By 자동)
     }
 
     /**
@@ -192,14 +168,12 @@ public class Order {
      * - 취소/완료 후 변경 불가
      * - 상태 전이 규칙 검증
      */
-    public void updateStatus(OrderStatus newStatus, String updatedBy) {
+    public void updateStatus(OrderStatus newStatus) {
         if (this.status == OrderStatus.CANCELLED || this.status == OrderStatus.COMPLETED) {
             throw new IllegalStateException("완료되었거나 취소된 주문은 상태를 변경할 수 없습니다.");
         }
         validateStatusTransition(this.status, newStatus);
         this.status = newStatus;
-        this.updatedAt = LocalDateTime.now();
-        this.updatedBy = updatedBy;
     }
 
     private void validateStatusTransition(OrderStatus current, OrderStatus next) {
@@ -211,8 +185,7 @@ public class Order {
             default -> false;
         };
         if (!valid) {
-            throw new IllegalStateException(
-                    String.format("상태 변경 불가: [%s] → [%s]", current, next));
+            throw new CustomException(OrderErrorCode.ORDER_STATUS_INVALID_TRANSITION);
         }
     }
 

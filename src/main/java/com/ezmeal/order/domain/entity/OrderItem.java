@@ -31,22 +31,14 @@ public class OrderItem {
     @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "created_by", length = 100, nullable = false)
-    private String createdBy;
 
     public static OrderItem create(Order order, String productName,
-                                   Integer productPrice, Integer quantity,
-                                   String createdBy) {
+                                   Integer productPrice, Integer quantity) {
         return OrderItem.builder()
                 .order(order)
                 .productName(productName)
                 .productPrice(productPrice)
                 .quantity(quantity)
-                .createdAt(LocalDateTime.now())
-                .createdBy(createdBy)
                 .build();
     }
 }
