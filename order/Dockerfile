@@ -1,6 +1,12 @@
 # ---- Build Stage ----
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
+
+ARG GPR_USER
+ARG GPR_TOKEN
+ENV GPR_USER=${GPR_USER}
+ENV GPR_TOKEN=${GPR_TOKEN}
+
 COPY gradlew .
 COPY gradle/ gradle/
 COPY build.gradle settings.gradle ./
