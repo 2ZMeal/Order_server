@@ -170,7 +170,7 @@ public class Order extends BaseEntity {
      */
     public void updateStatus(OrderStatus newStatus) {
         if (this.status == OrderStatus.CANCELLED || this.status == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("완료되었거나 취소된 주문은 상태를 변경할 수 없습니다.");
+            throw new CustomException(OrderErrorCode.ORDER_STATUS_ALREADY_FINAL);
         }
         validateStatusTransition(this.status, newStatus);
         this.status = newStatus;

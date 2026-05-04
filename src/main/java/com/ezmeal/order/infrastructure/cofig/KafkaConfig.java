@@ -8,17 +8,22 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+
+
 
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.util.backoff.FixedBackOff;
 
-@EnableKafka
+
+
 @Configuration
 public class KafkaConfig {
 
@@ -27,14 +32,15 @@ public class KafkaConfig {
 
     // ── Producer ──────────────────────────────────────────
     @Bean
-    @SuppressWarnings("removal")
     public ProducerFactory<String, Object> producerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.ACKS_CONFIG, "all");              // 데이터 유실 방지
-        config.put(ProducerConfig.RETRIES_CONFIG, 3);               // 재전송 3회
-        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true); // 중복 방지
-        return new DefaultKafkaProducerFactory<>(config, new StringSerializer(), new JsonSerializer<>());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        config.put(ProducerConfig.ACKS_CONFIG, "all");
+        config.put(ProducerConfig.RETRIES_CONFIG, 3);
+        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        return new DefaultKafkaProducerFactory<>(config);
     }
 
     @Bean
@@ -42,7 +48,8 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactory());
     }
 
-    // ── Consumer ──────────────────────────────────────────
+    // ── Consumer ──────────────────────────────────────────────────
+    // 공통 모듈 KafkaConsumerConfig 가 이 빈을 주입받아 ContainerFactory 구성
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
         Map<String, Object> config = new HashMap<>();
@@ -52,8 +59,30 @@ public class KafkaConfig {
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        config.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
         return new DefaultKafkaConsumerFactory<>(config);
+    }
+
+//    @Bean
+//    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
+//        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+//                new ConcurrentKafkaListenerContainerFactory<>();
+//        factory.setConsumerFactory(consumerFactory());
+//        factory.setConcurrency(3);
+//        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+//        return factory;
+//    }
+
+
+
+
+    @Bean
+    public DefaultErrorHandler defaultErrorHandler() {
+        // 실패 메시지 → {원본토픽}.DLT 로 자동 이동
+        // 예) payment.result 실패 → payment.result.DLT
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(kafkaTemplate());
+        FixedBackOff backOff = new FixedBackOff(1000L, 3L);  // 1초 간격 3회 재시도
+        return new DefaultErrorHandler(recoverer, backOff);
     }
 
 }
