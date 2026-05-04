@@ -1,6 +1,6 @@
-#spring:
-#  application:
-#    name: order-service
+spring:
+  application:
+    name: order-service
 
   config:
     import: "configserver:"      # Config Server에서 설정 가져옴
@@ -12,11 +12,6 @@
         max-attempts: 3
         initial-interval: 1000
 
-
-spring:
-  application:
-    name: order-service
-
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/order_db
     username: ${DB_USERNAME}
@@ -25,7 +20,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

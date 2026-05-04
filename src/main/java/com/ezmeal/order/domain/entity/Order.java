@@ -25,8 +25,8 @@ public class Order extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "customer_id", nullable = false, length = 100)
-    private String customerId;            // customerUsername → customerId
+    @Column(name = "user_id", nullable = false, length = 100)
+    private String userId;            // customerUsername → customerId
 
     @Column(name = "user_name", nullable = false, length = 100)
     private String userName;
@@ -91,11 +91,11 @@ public class Order extends BaseEntity {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String customerId, UUID companyId,
+    public static Order create(String userId, UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote, OrderType orderType) {
         return Order.builder()
-                .customerId(customerId)
+                .userId(userId)
                 .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)

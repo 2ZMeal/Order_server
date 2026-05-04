@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class OrderResponseDto {
 
     private UUID orderId;
-    private String userName;
+    private String userId;
     private UUID companyId;
     private String deliveryAddress;
     private String status;
@@ -25,12 +25,12 @@ public class OrderResponseDto {
     private String orderType;
     private List<OrderItemDto> items;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private LocalDateTime modifiedAt;
 
     public static OrderResponseDto from(Order order) {
         return OrderResponseDto.builder()
                 .orderId(order.getId())
-                .userName(order.getUserName())
+                .userId(order.getUserId())
                 .companyId(order.getCompanyId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .status(order.getStatus().name())
@@ -42,7 +42,7 @@ public class OrderResponseDto {
                         .map(OrderItemDto::from)
                         .collect(Collectors.toList()))
                 .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
+                .modifiedAt(order.getModifiedAt())
                 .build();
     }
 

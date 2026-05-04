@@ -11,7 +11,7 @@ public interface OrderRepository {
     Order save(Order order);
     Optional<Order> findById(UUID id);
     Page<Order> findAll(Pageable pageable);
-    Page<Order> findByUserName(String userName, Pageable pageable);
+    Page<Order> findByUserId(String userId, Pageable pageable);
     Page<Order> findByCompanyId(UUID companyId, Pageable pageable);
     Page<Order> searchWithFilters(
             UUID companyId,

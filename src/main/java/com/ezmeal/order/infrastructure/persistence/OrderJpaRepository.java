@@ -11,19 +11,19 @@ import java.util.UUID;
 
 public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
 
-    Page<Order> findByUserName(String userName, Pageable pageable);
+    Page<Order> findByUserId(String userId, Pageable pageable);
 
     Page<Order> findByCompanyId(UUID companyId, Pageable pageable);
 
     /**
      * 동적 조건 검색 (관리자/사장님/고객 공통)
-     * - companyId, userName, status, productName, 금액 범위 모두 optional
+     * - companyId, userId, status, productName, 금액 범위 모두 optional
      */
     @Query("""
         SELECT DISTINCT o FROM Order o
         JOIN o.orderItems oi
         WHERE (:companyId IS NULL OR o.companyId = :companyId)
-          AND (:userName IS NULL OR o.userName = :userName)
+          AND (:userId IS NULL OR o.userId = :userId)
           AND (:status IS NULL OR o.status = :status)
           AND (:productName IS NULL OR oi.productName LIKE %:productName%)
           AND (:minAmount IS NULL OR o.totalPrice >= :minAmount)
@@ -31,7 +31,7 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     """)
     Page<Order> searchWithFilters(
             @Param("companyId") UUID companyId,
-            @Param("userName") String userName,
+            @Param("userId") String userId,
             @Param("status") Order.OrderStatus status,
             @Param("productName") String productName,
             @Param("minAmount") Integer minAmount,

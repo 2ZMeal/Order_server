@@ -79,7 +79,7 @@ public class OrderSagaOrchestrator {
         eventPublisher.publishOrderCreated(event);
 
         // notification-service: 결제 진행 중 알림
-        publishStatusChangedEvent(order, Order.OrderStatus.READY, Order.OrderStatus.PENDING, "system");
+        publishStatusChangedEvent(order, Order.OrderStatus.READY, Order.OrderStatus.PENDING);
     }
 
     // ================================================================

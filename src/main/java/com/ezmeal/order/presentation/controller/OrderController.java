@@ -5,6 +5,7 @@ import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
 import com.ezmeal.order.application.dto.response.OrderResponseDto;
 import com.ezmeal.order.application.service.OrderService;
 import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.order.presentation.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,14 +38,13 @@ public class OrderController {
     @Operation(summary = "주문 목록 조회",
             description = "권한별 조회 - ADMIN: 전체, COMPANY: 본인 가게, USER: 본인 주문")
     public ResponseEntity<ApiResponse<Page<OrderResponseDto>>> getOrders(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal CustomUserPrincipal principal,
             @PageableDefault(size = 10, sort = "createdAt",
                     direction = Sort.Direction.DESC) Pageable pageable) {
 
         return ResponseEntity.ok(ApiResponse.success(
                 orderService.selectOrders(
-                        userDetails.getUsername(),
-                        extractRoles(userDetails),
+                        principal,
                         validatePageSize(pageable))));
     }
 
@@ -52,15 +52,14 @@ public class OrderController {
     @Operation(summary = "주문 검색 조회")
     public ResponseEntity<ApiResponse<Page<OrderResponseDto>>> searchOrders(
             @RequestBody OrderSearchRequestDto searchDto,
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal CustomUserPrincipal principal,
             @PageableDefault(size = 10, sort = "createdAt",
                     direction = Sort.Direction.DESC) Pageable pageable) {
 
         return ResponseEntity.ok(ApiResponse.success(
                 orderService.selectOrdersSearch(
                         searchDto,
-                        userDetails.getUsername(),
-                        extractRoles(userDetails),
+                        principal,
                         validatePageSize(pageable))));
     }
 
