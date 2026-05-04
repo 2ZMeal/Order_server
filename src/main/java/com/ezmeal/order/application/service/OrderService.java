@@ -48,36 +48,37 @@ public class OrderService {
                 CompanyInfo company = companyClient.getCompanyByCompany(principal.getUserId());
                 yield orderRepository.findByCompanyId(company.getCompanyId(), pageable);
             }
-            case USER    -> orderRepository.findByCustomerId(principal.getUserId(), pageable);  // ROLE_CUSTOMER → USER
+            case USER    -> orderRepository.findByUserId(principal.getUserId(), pageable);  // ROLE_CUSTOMER → USER
         };
         return page.map(OrderResponseDto::from);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY', 'USER')")
     public Page<OrderResponseDto> selectOrdersSearch(
-            OrderSearchRequestDto dto, String userName, List<String> roles, Pageable pageable) {
+            OrderSearchRequestDto dto, CustomUserPrincipal principal, Pageable pageable)
+    {
 
-        UUID companyId = null;
-        String customerUsername = null;
+        UUID companyId      = null;
+        String userId = null;           // customerUsername → customerId
 
-        if (roles.contains("ROLE_ADMIN")) {
-            // 관리자: DTO의 조건 그대로 사용
-            companyId = dto.getCompanyId();
-            customerUsername = dto.getUserName();
-        } else if (roles.contains("ROLE_COMPANY")) {
-            // 사장님: 본인 가게 ID로 고정
-            CompanyInfo company = companyClient.getCompanyByCompany(userName);
-            companyId = company.getCompanyId();
-        } else {
-            // 고객: 본인 userName으로 고정
-            customerUsername = userName;
+        switch (principal.getRole()) {
+            case ADMIN   -> {
+                companyId    = dto.getCompanyId();
+                userId = dto.getUserId();   // getCustomerUsername() → getCustomerId()
+            }
+            case COMPANY -> {
+                CompanyInfo store = companyClient.getCompanyByCompany(principal.getUserId());
+                companyId = store.getCompanyId();
+            }
+            case USER    -> userId = principal.getUserId();
         }
 
         Order.OrderStatus status = (dto.getStatus() != null)
                 ? Order.OrderStatus.valueOf(dto.getStatus()) : null;
 
+
         return orderRepository.searchWithFilters(
-                companyId, customerUsername, status,
+                companyId, userId, status,
                 dto.getProductName(), dto.getMinAmount(), dto.getMaxAmount(), pageable
         ).map(OrderResponseDto::from);
     }
