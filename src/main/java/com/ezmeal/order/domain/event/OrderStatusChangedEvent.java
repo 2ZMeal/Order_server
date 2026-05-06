@@ -22,7 +22,7 @@ import java.util.UUID;
 public class OrderStatusChangedEvent {
 
     private UUID orderId;
-    private String userName;
+    private String userId;
     private UUID companyId;
     private String previousStatus;
     private String currentStatus;

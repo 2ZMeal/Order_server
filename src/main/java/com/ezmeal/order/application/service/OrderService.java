@@ -125,8 +125,7 @@ public class OrderService {
                 company.getCompanyId(),
                 dto.getAddress(),
                 totalPrice,
-                dto.getComment(),
-                Order.OrderType.ONLINE
+                dto.getComment()
         );
 
         // 5. OrderItem 생성 및 연관관계 설정

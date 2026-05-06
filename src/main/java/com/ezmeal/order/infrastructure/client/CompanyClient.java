@@ -12,5 +12,5 @@ public interface CompanyClient {
     CompanyInfo getCompanyByName(@RequestParam("name") String companyName);
 
     @GetMapping("/api/v1/companys/by-company")
-    CompanyInfo getCompanyByCompany(@RequestParam("userName") String companyUserName);
+    CompanyInfo getCompanyByCompany(@RequestParam("userId") String companyUserId);
 }

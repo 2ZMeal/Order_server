@@ -7,7 +7,6 @@ import com.ezmeal.order.application.service.OrderService;
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.common.response.CommonApiResponse;
-import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
