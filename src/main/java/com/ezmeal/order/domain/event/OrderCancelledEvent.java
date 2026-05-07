@@ -1,5 +1,7 @@
 package com.ezmeal.order.domain.event;
 
+import com.ezmeal.order.domain.entity.OrderItem;
+import java.util.List;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,7 +19,7 @@ import java.util.UUID;
 public class OrderCancelledEvent {
 
     private UUID orderId;
-    private UUID companyId;
+    private List<OrderItem> orderItems;
     private String userId;
     private String cancelledBy;
 

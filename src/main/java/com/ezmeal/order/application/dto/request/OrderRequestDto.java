@@ -6,6 +6,7 @@ import java.util.List;
 @Getter
 public class OrderRequestDto {
 //    private String companyName;
+
     private String address;
     private String comment;
     private List<ProductItem> products;

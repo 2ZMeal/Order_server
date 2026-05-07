@@ -62,7 +62,6 @@ public class OrderSagaOrchestrator {
         // payment-service로 결제 요청 이벤트 발행
         OrderCreatedEvent event = OrderCreatedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
                 .userId(order.getUserId())
                 .totalPrice(order.getTotalPrice())
                 .deliveryAddress(order.getDeliveryAddress())
@@ -107,7 +106,6 @@ public class OrderSagaOrchestrator {
         // shipment-service로 배달 요청 이벤트 발행
         ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
                 .userId(order.getUserId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .requestNote(order.getRequestNote())
@@ -171,8 +169,8 @@ public class OrderSagaOrchestrator {
         // payment-service / shipment-service로 취소 이벤트 발행
         OrderCancelledEvent cancelledEvent = OrderCancelledEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
-//                .userId(order.getUserId())
+                .userId(order.getUserId())
+                .orderItems(order.getOrderItems())
                 .cancelledBy(cancelledBy)
                 .requiresPaymentCancellation(needsPaymentCancel)
                 .requiresShipmentCancellation(needsShipmentCancel)
@@ -227,7 +225,6 @@ public class OrderSagaOrchestrator {
         OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
                 .orderId(order.getId())
                 .userId(order.getUserId())
-                .companyId(order.getCompanyId())
                 .previousStatus(prevStatus.name())
                 .currentStatus(currentStatus.name())
                 .occurredAt(LocalDateTime.now())
@@ -241,7 +238,6 @@ public class OrderSagaOrchestrator {
     private void publishOrderCompletedEvent(Order order) {
         OrderCompletedEvent event = OrderCompletedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
                 .userId(order.getUserId())
                 .productNames(order.getOrderItems().stream()
                         .map(item -> item.getProductName())

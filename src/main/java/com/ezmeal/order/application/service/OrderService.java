@@ -15,6 +15,7 @@ import com.ezmeal.order.infrastructure.client.CompanyClient;
 import com.ezmeal.order.infrastructure.client.dto.CompanyInfo;
 import com.ezmeal.order.infrastructure.client.dto.ProductInfo;
 import com.ezmeal.order.infrastructure.client.ProductClient;
+import com.ezmeal.order.infrastructure.client.dto.ProductOrderCountRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -99,6 +100,9 @@ public class OrderService {
     public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
 
 
+
+
+
         // 1. 상품 정보 조회 (product-service FeignClient)
         List<String> productIds = dto.getProducts().stream()
                 .map(OrderRequestDto.ProductItem::getProductId)
@@ -126,7 +130,21 @@ public class OrderService {
                 dto.getComment()
         );
 
-        // 4. OrderItem 생성 및 연관관계 설정
+
+        //4. 재고 로직
+        for (OrderRequestDto.ProductItem product : dto.getProducts()) {
+            Integer quantity = product.getQuantity();
+            String productId= product.getProductId();
+
+            productClient.reserveOrderQuantity(
+
+                    new ProductOrderCountRequest(quantity, order.getId(), productId)
+            );
+
+        }
+
+
+        // 5. OrderItem 생성 및 연관관계 설정
         dto.getProducts().forEach(item -> {
             ProductInfo p = productMap.get(item.getProductId());
             if (p == null) throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
@@ -137,7 +155,7 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // 5. SAGA 시작 (결제 요청 이벤트 발행)
+        // 6. SAGA 시작 (결제 요청 이벤트 발행)
         sagaOrchestrator.onOrderCreated(savedOrder);
 
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
