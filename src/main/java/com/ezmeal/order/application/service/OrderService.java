@@ -97,40 +97,38 @@ public class OrderService {
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
-        // 1. 가게 정보 조회 (company-service FeignClient)
-        CompanyInfo company = companyClient.getCompanyByName(dto.getCompanyName());
 
-        // 2. 상품 정보 조회 (product-service FeignClient)
-        List<String> productNames = dto.getProducts().stream()
-                .map(OrderRequestDto.ProductItem::getProductName)
+
+        // 1. 상품 정보 조회 (product-service FeignClient)
+        List<String> productIds = dto.getProducts().stream()
+                .map(OrderRequestDto.ProductItem::getProductId)
                 .toList();
-        List<ProductInfo> products = productClient.getProductsByNames(productNames);
+        List<ProductInfo> products = productClient.getProductsByIds(productIds);
 
-        Map<String, ProductInfo> productMap = products.stream()
-                .collect(Collectors.toMap(ProductInfo::getName, p -> p));
+        Map<UUID, ProductInfo> productMap = products.stream()
+                .collect(Collectors.toMap(ProductInfo::getProductId, p -> p));
 
-        // 3. 총 금액 계산
+        // 2. 총 금액 계산
         int totalPrice = dto.getProducts().stream()
                 .mapToInt(item -> {
-                    ProductInfo p = productMap.get(item.getProductName());
+                    ProductInfo p = productMap.get(item.getProductId());
                     if (p == null) {
                         throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
                     }
                     return p.getPrice() * item.getQuantity();
                 }).sum();
 
-        // 4. Order 엔티티 생성
+        // 3. Order 엔티티 생성
         Order order = Order.create(
                 principal.getUserId(),
-                company.getCompanyId(),
                 dto.getAddress(),
                 totalPrice,
                 dto.getComment()
         );
 
-        // 5. OrderItem 생성 및 연관관계 설정
+        // 4. OrderItem 생성 및 연관관계 설정
         dto.getProducts().forEach(item -> {
-            ProductInfo p = productMap.get(item.getProductName());
+            ProductInfo p = productMap.get(item.getProductId());
             if (p == null) throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
             order.getOrderItems().add(
                     OrderItem.create(order, p.getName(), p.getPrice(), item.getQuantity())
@@ -139,7 +137,7 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // 6. SAGA 시작 (결제 요청 이벤트 발행)
+        // 5. SAGA 시작 (결제 요청 이벤트 발행)
         sagaOrchestrator.onOrderCreated(savedOrder);
 
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());

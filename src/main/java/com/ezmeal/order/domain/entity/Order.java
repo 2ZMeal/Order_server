@@ -26,10 +26,7 @@ public class Order extends BaseEntity {
     private UUID id;
 
     @Column(name = "user_id", nullable = false, length = 100)
-    private String userId;            // customerUsername → customerId
-
-//    @Column(name = "user_name", nullable = false, length = 100)
-//    private String userId;
+    private String userId;
 
     @Column(name = "company_id", nullable = false)
     private UUID companyId;
@@ -84,12 +81,13 @@ public class Order extends BaseEntity {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String userId, UUID companyId,
+    public static Order create(String userId,
+//                               UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote) {
         return Order.builder()
                 .userId(userId)
-                .companyId(companyId)
+//                .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)
                 .requestNote(requestNote)

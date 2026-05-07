@@ -5,14 +5,14 @@ import java.util.List;
 
 @Getter
 public class OrderRequestDto {
-    private String companyName;
+//    private String companyName;
     private String address;
     private String comment;
     private List<ProductItem> products;
 
     @Getter
     public static class ProductItem {
-        private String productName;
+        private String productId;
         private Integer quantity;
     }
 }
