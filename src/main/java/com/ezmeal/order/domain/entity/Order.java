@@ -28,9 +28,6 @@ public class Order extends BaseEntity {
     @Column(name = "user_id", nullable = false, length = 100)
     private String userId;
 
-    @Column(name = "company_id", nullable = false)
-    private UUID companyId;
-
     @Column(name = "delivery_address", length = 255)
     private String deliveryAddress;
 

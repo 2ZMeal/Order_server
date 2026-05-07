@@ -131,7 +131,7 @@ public class OrderService {
             ProductInfo p = productMap.get(item.getProductId());
             if (p == null) throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
             order.getOrderItems().add(
-                    OrderItem.create(order, p.getName(), p.getPrice(), item.getQuantity())
+                    OrderItem.create(order, p.getCompanyId(), p.getName(), p.getPrice(), item.getQuantity())
             );
         });
 
@@ -186,15 +186,6 @@ public class OrderService {
     public OrderResponseDto updateOrderStatus(UUID orderId, Order.OrderStatus newStatus,
                                               CustomUserPrincipal principal) {
         Order order = findOrder(orderId);
-
-        // COMPANY는 본인 가게 주문만 변경 가능
-        if (principal.getRole() == Role.COMPANY) {
-            CompanyInfo store = companyClient.getCompanyByCompany(principal.getUserId());
-            if (!order.getCompanyId().equals(store.getCompanyId())) {
-                throw new CustomException(OrderErrorCode.ORDER_STATUS_CHANGE_FORBIDDEN);
-            }
-        }
-
 
         Order.OrderStatus prevStatus = order.getStatus();
 

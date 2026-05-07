@@ -22,6 +22,9 @@ public class OrderItem {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    @Column(name = "company_id", nullable = false)
+    private UUID companyId;
+
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
@@ -32,10 +35,11 @@ public class OrderItem {
     private Integer quantity;
 
 
-    public static OrderItem create(Order order, String productName,
+    public static OrderItem create(Order order, UUID companyId, String productName,
                                    Integer productPrice, Integer quantity) {
         return OrderItem.builder()
                 .order(order)
+                .companyId(companyId)
                 .productName(productName)
                 .productPrice(productPrice)
                 .quantity(quantity)
