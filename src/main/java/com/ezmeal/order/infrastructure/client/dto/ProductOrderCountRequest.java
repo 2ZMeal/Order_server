@@ -6,7 +6,6 @@ public record ProductOrderCountRequest(
 
 
     Integer quantity,
-    UUID orderId,
-    String productId
+    UUID orderId
 ) {
     }

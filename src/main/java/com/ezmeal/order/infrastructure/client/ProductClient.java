@@ -16,15 +16,15 @@ import java.util.List;
 @FeignClient(name = "product-service", url = "${services.product.url}")
 public interface ProductClient {
 
-    @PostMapping("/internal/products/{productId}/order-quantity/reserve")
-    CommonApiResponse<Void> reserveOrderQuantity(/*@PathVariable List<String> productIds,*/
+    @PostMapping("/internal/v1/products/{productId}/order-quantity/reserve")
+    CommonApiResponse<Void> reserveOrderQuantity(@PathVariable String productId,
                                                  @RequestBody ProductOrderCountRequest request
     );
 
-    @PostMapping("/internal/products/{productId}/order-quantity/restore")
+    @PostMapping("/internal/v1/products/{productId}/order-quantity/restore")
     CommonApiResponse<Void> restoreOrderQuantity(
-    @PathVariable UUID productId,
-    @RequestBody ProductOrderCountRequest request
+            @PathVariable String productId,
+            @RequestBody ProductOrderCountRequest request
     );
 
     @GetMapping("/api/v1/products/by-ids")

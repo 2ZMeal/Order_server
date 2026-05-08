@@ -136,11 +136,13 @@ public class OrderService {
             Integer quantity = product.getQuantity();
             String productId= product.getProductId();
 
+            ProductOrderCountRequest request =
+                    new ProductOrderCountRequest(quantity, order.getId());
+
             productClient.reserveOrderQuantity(
-
-                    new ProductOrderCountRequest(quantity, order.getId(), productId)
+                    productId,
+                    request
             );
-
         }
 
 
