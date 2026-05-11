@@ -170,7 +170,6 @@ public class OrderService {
                     log.warn("[재고 예약 실패] productId={}, 롤백 시작",
                             product.getProductId());
 
-                    rollbackReservedStock(reservedItems, savedOrder.getId());
                     cancelOrderInternal(savedOrder, principal.getUserId());
 
                     throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
@@ -185,7 +184,6 @@ public class OrderService {
                 log.error("[재고 예약 오류] productId={}, 롤백 시작 - error={}",
                         product.getProductId(), e.getMessage());
 
-                rollbackReservedStock(reservedItems, savedOrder.getId());
                 cancelOrderInternal(savedOrder, principal.getUserId());
 
                 throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
@@ -198,29 +196,6 @@ public class OrderService {
 
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
         return OrderResponseDto.from(savedOrder);
-    }
-
-    /**
-     * 재고 예약 실패 시 이미 예약된 재고를 복구 (보상 트랜잭션)
-     * createOrder() 내부에서만 사용
-     */
-    private void rollbackReservedStock(List<OrderRequestDto.ProductItem> reservedItems,
-                                       UUID orderId) {
-        for (OrderRequestDto.ProductItem item : reservedItems) {
-            try {
-                productClient.restoreOrderQuantity(
-                        item.getProductId(),
-                        new ProductOrderCountRequest(item.getQuantity(), orderId)
-                );
-                log.info("[재고 롤백 성공] productId={}", item.getProductId());
-
-            } catch (Exception e) {
-                // 롤백도 실패한 경우 → 로그 남기고 수동 처리 필요
-                // DLQ 나 알림으로 운영팀에 전달
-                log.error("[재고 롤백 실패] productId={}, 수동 처리 필요 - error={}",
-                        item.getProductId(), e.getMessage());
-            }
-        }
     }
 
     /**
