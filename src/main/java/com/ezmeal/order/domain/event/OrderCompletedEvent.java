@@ -4,7 +4,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-
+import com.ezmeal.common.message.DomainEvent;
 /**
  * 주문 완료 이벤트 (status = COMPLETED)
  * → notification-service: 리뷰 작성 요청 알림 발송
@@ -15,7 +15,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderCompletedEvent {
+public class OrderCompletedEvent implements DomainEvent {
 
     private UUID orderId;
     private UUID companyId;

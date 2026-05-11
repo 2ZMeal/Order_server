@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.ezmeal.common.message.DomainEvent;
 
 /**
  * 주문 취소 이벤트
@@ -16,7 +17,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderCancelledEvent {
+public class OrderCancelledEvent implements DomainEvent {
 
     private UUID orderId;
     private List<OrderItem> orderItems;

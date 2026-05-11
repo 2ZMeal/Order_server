@@ -1,12 +1,13 @@
 package com.ezmeal.order.application.saga;
 
 import com.ezmeal.common.exception.CustomException;
+import com.ezmeal.common.message.CommonKafkaEventPublisher;  // 추가
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.event.*;
 import com.ezmeal.order.domain.event.OrderCancelledEvent.StockRestoreItem;
 import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
-import com.ezmeal.order.infrastructure.kafka.OrderEventPublisher;
+import com.ezmeal.order.infrastructure.kafka.KafkaTopics;  // 추가
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +44,7 @@ import java.util.UUID;
 public class OrderSagaOrchestrator {
 
     private final OrderRepository orderRepository;
-    private final OrderEventPublisher eventPublisher;
+    private final CommonKafkaEventPublisher eventPublisher;
 
     // ================================================================
     // STEP 1: 주문 생성 → 결제 요청 이벤트 발행
@@ -77,8 +78,12 @@ public class OrderSagaOrchestrator {
                 .occurredAt(LocalDateTime.now())
                 .build();
 
-        eventPublisher.publishOrderCreated(event);
-
+        eventPublisher.publish(
+                KafkaTopics.ORDER_CREATED,          // topic
+                order.getId().toString(),           // key (aggregateId - 순서 보장)
+                "ORDER_CREATED",                    // eventType
+                event                               // payload (DomainEvent 구현체)
+        );
         // notification-service: 결제 진행 중 알림
         publishStatusChangedEvent(order, Order.OrderStatus.READY, Order.OrderStatus.PENDING);
     }
@@ -113,7 +118,13 @@ public class OrderSagaOrchestrator {
                 .requestNote(order.getRequestNote())
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishShipmentRequested(shipmentEvent);
+
+        eventPublisher.publish(
+                KafkaTopics.SHIPMENT_REQUESTED,
+                order.getId().toString(),
+                "SHIPMENT_REQUESTED",
+                shipmentEvent
+        );
 
         // notification-service: 결제 완료(CONFIRMED) 상태 변경 알림
         publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED);
@@ -194,13 +205,18 @@ public class OrderSagaOrchestrator {
                 .stockRestoreItems(stockRestoreItems)           // 추가
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderCancelled(cancelledEvent);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_CANCELLED,
+                order.getId().toString(),
+                "ORDER_CANCELLED",
+                cancelledEvent
+        );
 
         // notification-service: 취소 알림
         publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED);
 
-        log.info("[SAGA][CANCEL] 완료 - orderId={}, paymentCancel={}, shipmentCancel={}",
-                order.getId(), needsPaymentCancel, needsShipmentCancel);
+        log.info("[SAGA][CANCEL] 완료 - orderId={}", order.getId());
     }
 
     // ================================================================
@@ -247,7 +263,13 @@ public class OrderSagaOrchestrator {
                 .currentStatus(currentStatus.name())
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderStatusChanged(event);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_STATUS_CHANGED,
+                order.getId().toString(),
+                "ORDER_STATUS_CHANGED",
+                event
+        );
     }
 
     /**
@@ -263,7 +285,14 @@ public class OrderSagaOrchestrator {
                 .totalPrice(order.getTotalPrice())
                 .completedAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderCompleted(event);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_COMPLETED,
+                order.getId().toString(),
+                "ORDER_COMPLETED",
+                event
+        );
+
         log.info("[SAGA] 리뷰 요청 이벤트 발행 완료 - orderId={}", order.getId());
     }
 
