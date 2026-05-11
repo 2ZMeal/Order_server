@@ -2,13 +2,16 @@ package com.ezmeal.order.application.service;
 
 import com.ezmeal.common.enums.Role;
 import com.ezmeal.common.exception.CustomException;
+import com.ezmeal.common.response.CommonApiResponse;
 import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.order.application.dto.request.OrderRequestDto;
+import com.ezmeal.order.application.dto.request.OrderRequestDto.ProductItem;
 import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
 import com.ezmeal.order.application.dto.response.OrderResponseDto;
 import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.entity.OrderItem;
+
 import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
 import com.ezmeal.order.infrastructure.client.CompanyClient;
@@ -16,6 +19,7 @@ import com.ezmeal.order.infrastructure.client.dto.CompanyInfo;
 import com.ezmeal.order.infrastructure.client.dto.ProductInfo;
 import com.ezmeal.order.infrastructure.client.ProductClient;
 import com.ezmeal.order.infrastructure.client.dto.ProductOrderCountRequest;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -103,8 +107,8 @@ public class OrderService {
 
 
 
-        // 1. 상품 정보 조회 (product-service FeignClient)
-        List<String> productIds = dto.getProducts().stream()
+        // 상품 정보 조회 (product-service FeignClient)
+        List<UUID> productIds = dto.getProducts().stream()
                 .map(OrderRequestDto.ProductItem::getProductId)
                 .toList();
         List<ProductInfo> products = productClient.getProductsByIds(productIds);
@@ -112,7 +116,7 @@ public class OrderService {
         Map<UUID, ProductInfo> productMap = products.stream()
                 .collect(Collectors.toMap(ProductInfo::getProductId, p -> p));
 
-        // 2. 총 금액 계산
+        // 총 금액 계산
         int totalPrice = dto.getProducts().stream()
                 .mapToInt(item -> {
                     ProductInfo p = productMap.get(item.getProductId());
@@ -122,7 +126,7 @@ public class OrderService {
                     return p.getPrice() * item.getQuantity();
                 }).sum();
 
-        // 3. Order 엔티티 생성
+        // Order 엔티티 생성
         Order order = Order.create(
                 principal.getUserId(),
                 dto.getAddress(),
@@ -131,37 +135,102 @@ public class OrderService {
         );
 
 
-        //4. 재고 로직
-        for (OrderRequestDto.ProductItem product : dto.getProducts()) {
-            Integer quantity = product.getQuantity();
-            String productId= product.getProductId();
-
-            ProductOrderCountRequest request =
-                    new ProductOrderCountRequest(quantity, order.getId());
-
-            productClient.reserveOrderQuantity(
-                    productId,
-                    request
-            );
-        }
 
 
-        // 5. OrderItem 생성 및 연관관계 설정
+        //  OrderItem 생성 및 연관관계 설정
         dto.getProducts().forEach(item -> {
             ProductInfo p = productMap.get(item.getProductId());
             if (p == null) throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
             order.getOrderItems().add(
-                    OrderItem.create(order, p.getCompanyId(), p.getName(), p.getPrice(), item.getQuantity())
+                    OrderItem.create(order, p.getCompanyId(), p.getProductId(), p.getName(), p.getPrice(), item.getQuantity())
             );
         });
 
         Order savedOrder = orderRepository.save(order);
 
-        // 6. SAGA 시작 (결제 요청 이벤트 발행)
+        // ── 재고 예약 ──────────────────────────────────────────────────
+        // 성공한 예약 목록 추적 (실패 시 롤백 대상)
+        List<ProductItem> reservedItems = new ArrayList<>();
+
+        for (OrderRequestDto.ProductItem product : dto.getProducts()) {
+            try {
+                CommonApiResponse<Void> response = productClient.reserveOrderQuantity(
+                        product.getProductId(),
+                        new ProductOrderCountRequest(product.getQuantity(), savedOrder.getId())
+                );
+
+                // product-service 가 성공 응답 반환 시
+                if (response != null && "SUCCESS".equals(response.getCode())) {
+                    reservedItems.add(product);   // 성공 목록에 추가
+                    log.info("[재고 예약 성공] productId={}, quantity={}",
+                            product.getProductId(), product.getQuantity());
+
+                } else {
+                    // product-service 가 실패 응답 반환 시 (재고 부족 등)
+                    log.warn("[재고 예약 실패] productId={}, 롤백 시작",
+                            product.getProductId());
+
+                    rollbackReservedStock(reservedItems, savedOrder.getId());
+                    cancelOrderInternal(savedOrder, principal.getUserId());
+
+                    throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
+                }
+
+            } catch (CustomException e) {
+                // CustomException 은 그대로 위로 던짐
+                throw e;
+
+            } catch (Exception e) {
+                // FeignClient 통신 자체가 실패한 경우 (product-service 장애 등)
+                log.error("[재고 예약 오류] productId={}, 롤백 시작 - error={}",
+                        product.getProductId(), e.getMessage());
+
+                rollbackReservedStock(reservedItems, savedOrder.getId());
+                cancelOrderInternal(savedOrder, principal.getUserId());
+
+                throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
+            }
+        }
+        // ──────────────────────────────────────────────────────────────
+
+        // 모든 재고 예약 성공 → SAGA 시작 (결제 요청 이벤트 발행)
         sagaOrchestrator.onOrderCreated(savedOrder);
 
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
         return OrderResponseDto.from(savedOrder);
+    }
+
+    /**
+     * 재고 예약 실패 시 이미 예약된 재고를 복구 (보상 트랜잭션)
+     * createOrder() 내부에서만 사용
+     */
+    private void rollbackReservedStock(List<OrderRequestDto.ProductItem> reservedItems,
+                                       UUID orderId) {
+        for (OrderRequestDto.ProductItem item : reservedItems) {
+            try {
+                productClient.restoreOrderQuantity(
+                        item.getProductId(),
+                        new ProductOrderCountRequest(item.getQuantity(), orderId)
+                );
+                log.info("[재고 롤백 성공] productId={}", item.getProductId());
+
+            } catch (Exception e) {
+                // 롤백도 실패한 경우 → 로그 남기고 수동 처리 필요
+                // DLQ 나 알림으로 운영팀에 전달
+                log.error("[재고 롤백 실패] productId={}, 수동 처리 필요 - error={}",
+                        item.getProductId(), e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 재고 예약 실패로 인한 주문 내부 취소 처리
+     * 일반 cancelOrder() 와 달리 5분 체크, 권한 체크 없이 바로 취소
+     */
+    private void cancelOrderInternal(Order order, String cancelledBy) {
+        order.cancel(cancelledBy);
+        orderRepository.save(order);
+        log.info("[OrderService] 재고 예약 실패로 주문 취소 - orderId={}", order.getId());
     }
 
     // ========================

@@ -25,6 +25,9 @@ public class OrderItem {
     @Column(name = "company_id", nullable = false)
     private UUID companyId;
 
+    @Column(name = "product_id", nullable = false, length = 255)
+    private UUID productId;      // 추가: 재고 복구 시 필요
+
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
@@ -35,11 +38,12 @@ public class OrderItem {
     private Integer quantity;
 
 
-    public static OrderItem create(Order order, UUID companyId, String productName,
+    public static OrderItem create(Order order, UUID companyId, UUID productId, String productName,
                                    Integer productPrice, Integer quantity) {
         return OrderItem.builder()
                 .order(order)
                 .companyId(companyId)
+                .productId(productId)      // 추가
                 .productName(productName)
                 .productPrice(productPrice)
                 .quantity(quantity)

@@ -1,5 +1,6 @@
 package com.ezmeal.order.application.dto.request;
 
+import java.util.UUID;
 import lombok.Getter;
 import java.util.List;
 
@@ -13,7 +14,7 @@ public class OrderRequestDto {
 
     @Getter
     public static class ProductItem {
-        private String productId;
+        private UUID productId;
         private Integer quantity;
     }
 }

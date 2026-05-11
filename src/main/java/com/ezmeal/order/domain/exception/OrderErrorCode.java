@@ -21,7 +21,13 @@ public enum OrderErrorCode implements ErrorCode {
     ORDER_STATUS_INVALID_TRANSITION(HttpStatus.BAD_REQUEST,"ORDER_400_5", "허용되지 않는 주문 상태 변경입니다."),
     ORDER_STATUS_ALREADY_FINAL(HttpStatus.BAD_REQUEST,    "ORDER_400_6", "완료되었거나 취소된 주문은 상태를 변경할 수 없습니다."),
     ORDER_ACCESS_DENIED(HttpStatus.FORBIDDEN,     "ORDER_403_3", "해당 주문에 대한 접근 권한이 없습니다."),
-    STORE_OWNER_NOT_FOUND(HttpStatus.NOT_FOUND,   "STORE_404_1", "운영 중인 가게 정보를 찾을 수 없습니다.");
+    STORE_OWNER_NOT_FOUND(HttpStatus.NOT_FOUND,   "STORE_404_1", "운영 중인 가게 정보를 찾을 수 없습니다."),
+
+    STOCK_RESERVE_FAILED(HttpStatus.BAD_REQUEST,
+    "ORDER_400_7", "재고 예약에 실패했습니다. 재고가 부족합니다."),
+
+    STOCK_RESTORE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR,
+    "ORDER_500_1", "재고 복구 요청에 실패했습니다.");
 
     private final HttpStatus status;
     private final String code;

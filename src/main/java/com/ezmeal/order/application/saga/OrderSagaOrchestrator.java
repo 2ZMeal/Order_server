@@ -3,9 +3,11 @@ package com.ezmeal.order.application.saga;
 import com.ezmeal.common.exception.CustomException;
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.event.*;
+import com.ezmeal.order.domain.event.OrderCancelledEvent.StockRestoreItem;
 import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
 import com.ezmeal.order.infrastructure.kafka.OrderEventPublisher;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -166,6 +168,20 @@ public class OrderSagaOrchestrator {
                 || prevStatus == Order.OrderStatus.CONFIRMED;
         boolean needsShipmentCancel = prevStatus == Order.OrderStatus.CONFIRMED;
 
+        // 재고 복구 필요 여부: READY 이후 상태에서 취소 = 재고 예약이 완료된 상태
+        // READY: 주문 생성됐지만 재고 예약 전 → 복구 불필요
+        // PENDING 이상: 재고 예약 완료 → 복구 필요
+        boolean needsStockRestore = prevStatus != Order.OrderStatus.READY;
+
+        // 복구 대상 상품 목록 (OrderItem 에서 추출)
+        List<StockRestoreItem> stockRestoreItems =
+                order.getOrderItems().stream()
+                        .map(item -> OrderCancelledEvent.StockRestoreItem.builder()
+                                .productId(item.getProductId())   // OrderItem 에 productId 필드 있어야 함
+                                .quantity(item.getQuantity())
+                                .build())
+                        .toList();
+
         // payment-service / shipment-service로 취소 이벤트 발행
         OrderCancelledEvent cancelledEvent = OrderCancelledEvent.builder()
                 .orderId(order.getId())
@@ -174,6 +190,8 @@ public class OrderSagaOrchestrator {
                 .cancelledBy(cancelledBy)
                 .requiresPaymentCancellation(needsPaymentCancel)
                 .requiresShipmentCancellation(needsShipmentCancel)
+                .requiresStockRestore(needsStockRestore)        // 추가
+                .stockRestoreItems(stockRestoreItems)           // 추가
                 .occurredAt(LocalDateTime.now())
                 .build();
         eventPublisher.publishOrderCancelled(cancelledEvent);
