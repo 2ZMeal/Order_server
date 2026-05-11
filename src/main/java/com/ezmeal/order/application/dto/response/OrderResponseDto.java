@@ -30,7 +30,6 @@ public class OrderResponseDto {
         return OrderResponseDto.builder()
                 .orderId(order.getId())
                 .userId(order.getUserId())
-                .companyId(order.getCompanyId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .status(order.getStatus().name())
                 .sagaStatus(order.getSagaStatus() != null ? order.getSagaStatus().name() : null)
