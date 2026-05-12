@@ -1,6 +1,9 @@
 spring:
   application:
     name: order-service
+  zipkin:
+    enabled: false  # 로컬에서 Zipkin 서버 없이 실행할 때
+
 
   config:
     import: "configserver:"      # Config Server에서 설정 가져옴
@@ -45,4 +48,11 @@ services:
 
 server:
   port: 8082
+
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0  # 1.0 = 100% 추적
+
 

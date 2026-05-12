@@ -30,22 +30,22 @@ public class KafkaConfig {
     private String bootstrapServers;
 
     // ── Producer ──────────────────────────────────────────
-    @Bean
-    public ProducerFactory<String, String> producerFactory() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.ACKS_CONFIG, "all");
-        config.put(ProducerConfig.RETRIES_CONFIG, 3);
-        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        return new DefaultKafkaProducerFactory<>(config);
-    }
+//    @Bean
+//    public ProducerFactory<String, String> producerFactory() {
+//        Map<String, Object> config = new HashMap<>();
+//        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+//        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+//        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+//        config.put(ProducerConfig.ACKS_CONFIG, "all");
+//        config.put(ProducerConfig.RETRIES_CONFIG, 3);
+//        config.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+//        return new DefaultKafkaProducerFactory<>(config);
+//    }
 
-    @Bean
-    public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
-    }
+//    @Bean
+//    public KafkaTemplate<String, String> kafkaTemplate() {
+//        return new KafkaTemplate<>(producerFactory());
+//    }
 
     // ── Consumer ──────────────────────────────────────────────────
     // 공통 모듈 KafkaConsumerConfig 가 이 빈을 주입받아 ContainerFactory 구성
@@ -74,14 +74,30 @@ public class KafkaConfig {
 
 
 
-    @Bean
-    public DefaultErrorHandler defaultErrorHandler() {
-        // 실패 메시지 → {원본토픽}.DLT 로 자동 이동
-        // 예) payment.result 실패 → payment.result.DLT
-        DeadLetterPublishingRecoverer recoverer =
-                new DeadLetterPublishingRecoverer(kafkaTemplate());
-        FixedBackOff backOff = new FixedBackOff(1000L, 3L);  // 1초 간격 3회 재시도
-        return new DefaultErrorHandler(recoverer, backOff);
-    }
+//    @Bean
+//    public DefaultErrorHandler defaultErrorHandler() {
+//        // 실패 메시지 → {원본토픽}.DLT 로 자동 이동
+//        // 예) payment.result 실패 → payment.result.DLT
+//        DeadLetterPublishingRecoverer recoverer =
+//                new DeadLetterPublishingRecoverer(kafkaTemplate());
+//        FixedBackOff backOff = new FixedBackOff(1000L, 3L);  // 1초 간격 3회 재시도
+//        return new DefaultErrorHandler(recoverer, backOff);
+//    }
 
+
+    // DLQ ErrorHandler 는 order-service 전용이므로 유지
+    // 공통 모듈의 kafkaTemplate 빈을 주입받아 사용
+    @Bean
+    public DefaultErrorHandler defaultErrorHandler(
+            KafkaTemplate<String, String> kafkaTemplate) {  // 생성자 주입으로 변경
+        DeadLetterPublishingRecoverer recoverer =
+                new DeadLetterPublishingRecoverer(kafkaTemplate);
+        FixedBackOff backOff = new FixedBackOff(1000L, 3L);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
+        errorHandler.addNotRetryableExceptions(
+                com.fasterxml.jackson.core.JsonParseException.class,
+                com.fasterxml.jackson.databind.exc.InvalidFormatException.class
+        );
+        return errorHandler;
+    }
 }

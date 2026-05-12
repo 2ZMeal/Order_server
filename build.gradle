@@ -71,6 +71,11 @@ dependencies {
 
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     // EmbeddedKafka 지원 (실제 Kafka 없이 통합 테스트 가능)
+
+
+    // Micrometer Tracing + Zipkin (Tracer 빈 자동 등록)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
 }
 
 
