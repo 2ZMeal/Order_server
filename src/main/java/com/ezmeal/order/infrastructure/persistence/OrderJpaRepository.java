@@ -13,7 +13,16 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
 
     Page<Order> findByUserId(String userId, Pageable pageable);
 
-    Page<Order> findByCompanyId(UUID companyId, Pageable pageable);
+
+    // OrderItem 의 companyId 로 조회, DISTINCT 로 Order 중복 제거
+    @Query("""
+    SELECT DISTINCT o FROM Order o
+    JOIN o.orderItems oi
+    WHERE oi.companyId = :companyId
+      AND o.deletedAt IS NULL
+      AND oi.deletedAt IS NULL
+""")
+    Page<Order> findByCompanyId(@Param("companyId") UUID companyId, Pageable pageable);
 
     /**
      * 동적 조건 검색 (관리자/사장님/고객 공통)
@@ -22,7 +31,7 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     @Query("""
         SELECT DISTINCT o FROM Order o
         JOIN o.orderItems oi
-        WHERE (:companyId IS NULL OR o.companyId = :companyId)
+        WHERE (:companyId IS NULL OR  oi.companyId = :companyId)
           AND (:userId IS NULL OR o.userId = :userId)
           AND (:status IS NULL OR o.status = :status)
           AND (:productName IS NULL OR oi.productName LIKE %:productName%)
