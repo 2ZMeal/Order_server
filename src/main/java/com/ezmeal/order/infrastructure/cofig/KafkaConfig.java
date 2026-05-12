@@ -49,17 +49,17 @@ public class KafkaConfig {
 
     // ── Consumer ──────────────────────────────────────────────────
     // 공통 모듈 KafkaConsumerConfig 가 이 빈을 주입받아 ContainerFactory 구성
-    @Bean
-    public ConsumerFactory<String, Object> consumerFactory() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, "order-service-group");
-        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        return new DefaultKafkaConsumerFactory<>(config);
-    }
+//    @Bean
+//    public ConsumerFactory<String, Object> consumerFactory() {
+//        Map<String, Object> config = new HashMap<>();
+//        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+//        config.put(ConsumerConfig.GROUP_ID_CONFIG, "order-service-group");
+//        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+//        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+//        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+//        config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+//        return new DefaultKafkaConsumerFactory<>(config);
+//    }
 
 //    @Bean
 //    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
