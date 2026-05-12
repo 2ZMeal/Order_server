@@ -31,7 +31,8 @@ public interface OrderJpaRepository extends JpaRepository<Order, UUID> {
     @Query("""
         SELECT DISTINCT o FROM Order o
         JOIN o.orderItems oi
-          WHERE o.deletedAt IS NULL
+         WHERE o.deletedAt IS NULL
+          AND oi.deletedAt IS NULL
           AND (:companyId IS NULL OR  oi.companyId = :companyId)
           AND (:userId IS NULL OR o.userId = :userId)
           AND (:status IS NULL OR o.status = :status)
