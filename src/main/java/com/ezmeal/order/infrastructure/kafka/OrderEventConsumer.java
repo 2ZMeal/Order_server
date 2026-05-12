@@ -1,13 +1,21 @@
 package com.ezmeal.order.infrastructure.kafka;
 
+import com.ezmeal.common.message.EventEnvelope;
+import com.ezmeal.common.message.inbox.InboxProcessor;
+import com.ezmeal.common.security.principal.CustomUserPrincipal;
+import com.ezmeal.common.enums.Role;
 import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
+import com.ezmeal.order.domain.dlq.DlqEventRecord;
 import com.ezmeal.order.infrastructure.kafka.dto.PaymentResultMessage;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ezmeal.order.infrastructure.kafka.dto.StockRestoreResultMessage;
+import com.ezmeal.order.infrastructure.persistence.DlqEventJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,22 +30,29 @@ import org.springframework.stereotype.Component;
 public class OrderEventConsumer {
 
     private final OrderSagaOrchestrator sagaOrchestrator;
-    private final ObjectMapper objectMapper;
+    private final InboxProcessor inboxProcessor;            // 공통 모듈 주입
+    private final DlqEventJpaRepository dlqEventJpaRepository;
 
+    // ── 결제 결과 수신 ─────────────────────────────────────────────
     /**
-     * payment-service로부터 결제 결과 수신
-     * <p>
-     * 성공: onPaymentCompleted() → CONFIRMED + shipment.requested + order.status.changed 발행 실패: onPaymentFailed()    →
-     * CANCELLED + order.status.changed 발행 (보상)
+     * payment-service 로부터 결제 결과 수신
+     *
+     * 공통 모듈 KafkaConsumerConfig 의 StringJsonMessageConverter 가
+     * JSON 문자열을 EventEnvelope<PaymentResultMessage> 로 자동 역직렬화
+     *
+     * InboxProcessor.processOnce() 로 중복 수신 방어
      */
     @KafkaListener(
             topics = KafkaTopics.PAYMENT_RESULT,
             groupId = "order-service-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumePaymentResult(String message) {
-        try {
-            PaymentResultMessage result = objectMapper.readValue(message, PaymentResultMessage.class);
+    public void consumePaymentResult(EventEnvelope<PaymentResultMessage> envelope) {
+
+        // processOnce(): 같은 eventId 가 오면 람다식 안 실행 (멱등성 보장)
+        inboxProcessor.processOnce(envelope.eventId(), () -> {
+
+            PaymentResultMessage result = envelope.payload();
             log.info("[Kafka][CONSUME] payment.result - orderId={}, success={}",
                     result.getOrderId(), result.isSuccess());
 
@@ -52,28 +67,84 @@ public class OrderEventConsumer {
                         result.getReason()
                 );
             }
-
-//        } catch (JsonProcessingException e) {
-//            // 메시지 파싱 자체가 실패 → 재처리해도 또 실패함
-//            // 이 경우 ack 해서 넘기고 DLQ로 보내는 게 맞음
-//            log.error("[Kafka][CONSUME] 메시지 파싱 실패 (DLQ 이동) - message={}", message, e);
-//            ack.acknowledge(); // 무한 재처리 방지를 위해 커밋하고 넘김
-//
-//        } catch (Exception e) {
-//            // 비즈니스 로직 실패 → 재처리 가능성 있음
-//            // ack 안 하면 컨슈머 재시작 시 재처리됨
-//            log.error("[Kafka][CONSUME] 처리 실패, 재처리 대기 - orderId 파싱 시도", e);
-//            // ack 미호출 → 재처리
-//        }
-//
-//    }
-
-            // ack 제거 (공통 모듈 ContainerFactory AckMode 에 위임)
-
-        } catch (Exception e) {
-            log.error("[Kafka][CONSUME] payment.result 처리 실패 - message={}", message, e);
-            throw new RuntimeException("payment.result 처리 실패", e);
-            // RuntimeException 재throw → DefaultErrorHandler 가 재시도 3회 후 DLQ 이동
-        }
+        });
     }
+
+
+
+    // ── 재고 복구 결과 수신 ────────────────────────────────────────
+    /**
+     * product-service 가 재고 복구 후 발행하는 결과 이벤트 수신
+     *
+     * 성공: 로그 기록
+     * 실패: DLQ 저장 → 수동 처리 필요
+     */
+    @KafkaListener(
+            topics = KafkaTopics.STOCK_RESTORE_RESULT,
+            groupId = "order-service-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumeStockRestoreResult(EventEnvelope<StockRestoreResultMessage> envelope) {
+
+        inboxProcessor.processOnce(envelope.eventId(), () -> {
+
+            StockRestoreResultMessage result = envelope.payload();
+
+            log.info("[Kafka][CONSUME] stock.restore.result - orderId={}, success={}",
+                    result.getOrderId(), result.isSuccess());
+
+            if (result.isSuccess()) {
+                log.info("[재고 복구 완료] orderId={}", result.getOrderId());
+
+            } else {
+                log.error("[재고 복구 실패] orderId={}, reason={}, productId={}",
+                        result.getOrderId(), result.getReason(), result.getProductId());
+
+                dlqEventJpaRepository.save(DlqEventRecord.create(
+                        KafkaTopics.STOCK_RESTORE_RESULT,
+                        KafkaTopics.STOCK_RESTORE_RESULT + ".FAILED",
+                        result.getOrderId().toString(),
+                        result.toString(),
+                        "재고 복구 실패: " + result.getReason()
+                ));
+            }
+        });
+    }
+
+    // ── payment.result DLT 수신 ────────────────────────────────────
+    @KafkaListener(
+            topics = "payment.result.DLT",
+            groupId = "order-service-dlq-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumePaymentResultDlt(
+            String message,
+            @Header(KafkaHeaders.DLT_EXCEPTION_MESSAGE) String exceptionMessage,
+            @Header(KafkaHeaders.DLT_ORIGINAL_TOPIC) String originalTopic,
+            @Header(value = KafkaHeaders.DLT_KEY_EXCEPTION_MESSAGE, required = false) String key) {
+
+        log.error("[DLT] 처리 실패 메시지 수신 - topic={}, error={}",
+                originalTopic, exceptionMessage);
+
+        DlqEventRecord record = DlqEventRecord.create(
+                originalTopic,
+                "payment.result.DLT",
+                key,
+                message,
+                exceptionMessage
+        );
+        dlqEventJpaRepository.save(record);
+    }
+
+    // ── 현재 인증 정보 추출 헬퍼 ──────────────────────────────────
+    // KafkaSecurityInterceptor 가 헤더에서 복구해준 유저 정보를 꺼냄
+    private CustomUserPrincipal getCurrentPrincipal() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()
+                && auth.getPrincipal() instanceof CustomUserPrincipal principal) {
+            return principal;
+        }
+        return new CustomUserPrincipal("SYSTEM", Role.ADMIN, "system@ezmeal.com");
+    }
+
 }

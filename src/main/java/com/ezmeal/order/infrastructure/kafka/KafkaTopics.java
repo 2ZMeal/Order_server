@@ -22,5 +22,9 @@ public final class KafkaTopics {
     /** payment-service 발행: 결제 처리 결과 (성공/실패) */
     public static final String PAYMENT_RESULT         = "payment.result";
 
+    // 추가: 재고 복구 결과 수신 (product-service 가 발행)
+    public static final String STOCK_RESTORE_RESULT = "stock.restore.result";
+
+
     private KafkaTopics() {}
 }

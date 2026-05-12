@@ -1,17 +1,25 @@
 package com.ezmeal.order.application.service;
 
+import com.ezmeal.common.enums.Role;
+import com.ezmeal.common.exception.CustomException;
+import com.ezmeal.common.response.CommonApiResponse;
 import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.order.application.dto.request.OrderRequestDto;
+import com.ezmeal.order.application.dto.request.OrderRequestDto.ProductItem;
 import com.ezmeal.order.application.dto.request.OrderSearchRequestDto;
 import com.ezmeal.order.application.dto.response.OrderResponseDto;
 import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.entity.OrderItem;
+
+import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
 import com.ezmeal.order.infrastructure.client.CompanyClient;
 import com.ezmeal.order.infrastructure.client.dto.CompanyInfo;
 import com.ezmeal.order.infrastructure.client.dto.ProductInfo;
 import com.ezmeal.order.infrastructure.client.ProductClient;
+import com.ezmeal.order.infrastructure.client.dto.ProductOrderCountRequest;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -93,54 +101,111 @@ public class OrderService {
 
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public OrderResponseDto createOrder(String userName, OrderRequestDto dto) {
-        // 1. 가게 정보 조회 (company-service FeignClient)
-        CompanyInfo company = companyClient.getCompanyByName(dto.getCompanyName());
+    public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
 
-        // 2. 상품 정보 조회 (product-service FeignClient)
-        List<String> productNames = dto.getProducts().stream()
-                .map(OrderRequestDto.ProductItem::getProductName)
+
+
+
+
+        // 상품 정보 조회 (product-service FeignClient)
+        List<UUID> productIds = dto.getProducts().stream()
+                .map(OrderRequestDto.ProductItem::getProductId)
                 .toList();
-        List<ProductInfo> products = productClient.getProductsByNames(productNames);
+        List<ProductInfo> products = productClient.getProductsByIds(productIds);
 
-        Map<String, ProductInfo> productMap = products.stream()
-                .collect(Collectors.toMap(ProductInfo::getName, p -> p));
+        Map<UUID, ProductInfo> productMap = products.stream()
+                .collect(Collectors.toMap(ProductInfo::getProductId, p -> p));
 
-        // 3. 총 금액 계산
+        // 총 금액 계산
         int totalPrice = dto.getProducts().stream()
                 .mapToInt(item -> {
-                    ProductInfo p = productMap.get(item.getProductName());
+                    ProductInfo p = productMap.get(item.getProductId());
                     if (p == null) {
-                        throw new IllegalArgumentException("상품을 찾을 수 없습니다: " + item.getProductName());
+                        throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
                     }
                     return p.getPrice() * item.getQuantity();
                 }).sum();
 
-        // 4. Order 엔티티 생성
+        // Order 엔티티 생성
         Order order = Order.create(
-                userName,
-                company.getCompanyId(),
+                principal.getUserId(),
                 dto.getAddress(),
                 totalPrice,
-                dto.getComment(),
-                Order.OrderType.ONLINE
+                dto.getComment()
         );
 
-        // 5. OrderItem 생성 및 연관관계 설정
+
+
+
+        //  OrderItem 생성 및 연관관계 설정
         dto.getProducts().forEach(item -> {
-            ProductInfo p = productMap.get(item.getProductName());
+            ProductInfo p = productMap.get(item.getProductId());
+            if (p == null) throw new CustomException(OrderErrorCode.PRODUCT_NOT_FOUND);
             order.getOrderItems().add(
-                    OrderItem.create(order, p.getName(), p.getPrice(), item.getQuantity())
+                    OrderItem.create(order, p.getCompanyId(), p.getProductId(), p.getName(), p.getPrice(), item.getQuantity())
             );
         });
 
         Order savedOrder = orderRepository.save(order);
 
-        // 6. SAGA 시작 (결제 요청 이벤트 발행)
+        // ── 재고 예약 ──────────────────────────────────────────────────
+        // 성공한 예약 목록 추적 (실패 시 롤백 대상)
+        List<ProductItem> reservedItems = new ArrayList<>();
+
+        for (OrderRequestDto.ProductItem product : dto.getProducts()) {
+            try {
+                CommonApiResponse<Void> response = productClient.reserveOrderQuantity(
+                        product.getProductId(),
+                        new ProductOrderCountRequest(product.getQuantity(), savedOrder.getId())
+                );
+
+                // product-service 가 성공 응답 반환 시
+                if (response != null && "SUCCESS".equals(response.getCode())) {
+                    reservedItems.add(product);   // 성공 목록에 추가
+                    log.info("[재고 예약 성공] productId={}, quantity={}",
+                            product.getProductId(), product.getQuantity());
+
+                } else {
+                    // product-service 가 실패 응답 반환 시 (재고 부족 등)
+                    log.warn("[재고 예약 실패] productId={}, 롤백 시작",
+                            product.getProductId());
+
+                    cancelOrderInternal(savedOrder, principal.getUserId());
+
+                    throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
+                }
+
+            } catch (CustomException e) {
+                // CustomException 은 그대로 위로 던짐
+                throw e;
+
+            } catch (Exception e) {
+                // FeignClient 통신 자체가 실패한 경우 (product-service 장애 등)
+                log.error("[재고 예약 오류] productId={}, 롤백 시작 - error={}",
+                        product.getProductId(), e.getMessage());
+
+                cancelOrderInternal(savedOrder, principal.getUserId());
+
+                throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
+            }
+        }
+        // ──────────────────────────────────────────────────────────────
+
+        // 모든 재고 예약 성공 → SAGA 시작 (결제 요청 이벤트 발행)
         sagaOrchestrator.onOrderCreated(savedOrder);
 
-        log.info("[OrderService] 주문 생성 완료 - orderId={}, userName={}", savedOrder.getId(), userName);
+        log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
         return OrderResponseDto.from(savedOrder);
+    }
+
+    /**
+     * 재고 예약 실패로 인한 주문 내부 취소 처리
+     * 일반 cancelOrder() 와 달리 5분 체크, 권한 체크 없이 바로 취소
+     */
+    private void cancelOrderInternal(Order order, String cancelledBy) {
+        order.cancel(cancelledBy);
+        orderRepository.save(order);
+        log.info("[OrderService] 재고 예약 실패로 주문 취소 - orderId={}", order.getId());
     }
 
     // ========================
@@ -149,28 +214,28 @@ public class OrderService {
 
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER', 'COMPANY')")
-    public OrderResponseDto cancelOrder(UUID orderId, String userName, List<String> roles) {
+    public OrderResponseDto cancelOrder(UUID orderId, CustomUserPrincipal principal) {
         Order order = findOrder(orderId);
+        Role role = principal.getRole();
 
         // 고객 본인 주문인지 확인 (관리자는 예외)
-        boolean isAdmin = roles.contains("ROLE_ADMIN");
-        if (!isAdmin && !order.getUserName().equals(userName)) {
-            throw new IllegalArgumentException("본인의 주문만 취소할 수 있습니다.");
+        if (role == Role.USER && !order.getUserId().equals(principal.getUserId())) {
+            throw new CustomException(OrderErrorCode.ORDER_CANCEL_FORBIDDEN);   // CustomException 으로 교체
         }
 
         // 고객은 5분 이내만 취소 가능, 관리자는 상태 제한만 적용
-        if (!isAdmin && !order.isCancellable()) {
-            throw new IllegalStateException("주문 후 5분이 경과하였거나 이미 처리된 주문입니다.");
+        if (role == Role.USER && !order.isCancellable()) {
+            throw new CustomException(OrderErrorCode.ORDER_CANCEL_TIME_EXPIRED);  // CustomException 으로 교체
         }
 
         Order.OrderStatus prevStatus = order.getStatus();
 
         // 도메인 취소 처리 (상태 검증 포함 - DELIVERING 이후는 불가)
-        order.cancel(userName);
+        order.cancel(principal.getUserId());
         orderRepository.save(order);
 
         // SAGA: 결제 취소 + 배달 취소 + 취소 알림 이벤트 발행
-        sagaOrchestrator.onOrderCancelled(order, prevStatus, userName);
+        sagaOrchestrator.onOrderCancelled(order, prevStatus, principal.getUserId());
 
         log.info("[OrderService] 주문 취소 완료 - orderId={}, prevStatus={}", orderId, prevStatus);
         return OrderResponseDto.from(order);
@@ -183,17 +248,8 @@ public class OrderService {
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'COMPANY')")
     public OrderResponseDto updateOrderStatus(UUID orderId, Order.OrderStatus newStatus,
-                                              String userName, List<String> roles) {
+                                              CustomUserPrincipal principal) {
         Order order = findOrder(orderId);
-
-        // COMPANY는 본인 가게 주문만 변경 가능
-        boolean isStaff = roles.contains("ROLE_ADMIN");
-        if (!isStaff) {
-            CompanyInfo company = companyClient.getCompanyByCompany(userName);
-            if (!order.getCompanyId().equals(company.getCompanyId())) {
-                throw new IllegalArgumentException("본인 가게의 주문만 상태를 변경할 수 있습니다.");
-            }
-        }
 
         Order.OrderStatus prevStatus = order.getStatus();
 
@@ -210,6 +266,7 @@ public class OrderService {
 
     private Order findOrder(UUID orderId) {
         return orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + orderId));
+                .orElseThrow(() -> new CustomException(OrderErrorCode.ORDER_NOT_FOUND));
     }
+
 }

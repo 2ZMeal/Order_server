@@ -1,11 +1,14 @@
 package com.ezmeal.order.application.saga;
 
 import com.ezmeal.common.exception.CustomException;
+import com.ezmeal.common.message.CommonKafkaEventPublisher;  // 추가
 import com.ezmeal.order.domain.entity.Order;
 import com.ezmeal.order.domain.event.*;
+import com.ezmeal.order.domain.event.OrderCancelledEvent.StockRestoreItem;
 import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
-import com.ezmeal.order.infrastructure.kafka.OrderEventPublisher;
+import com.ezmeal.order.infrastructure.kafka.KafkaTopics;  // 추가
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -41,7 +44,7 @@ import java.util.UUID;
 public class OrderSagaOrchestrator {
 
     private final OrderRepository orderRepository;
-    private final OrderEventPublisher eventPublisher;
+    private final CommonKafkaEventPublisher eventPublisher;
 
     // ================================================================
     // STEP 1: 주문 생성 → 결제 요청 이벤트 발행
@@ -62,8 +65,7 @@ public class OrderSagaOrchestrator {
         // payment-service로 결제 요청 이벤트 발행
         OrderCreatedEvent event = OrderCreatedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
-                .userName(order.getUserName())
+                .userId(order.getUserId())
                 .totalPrice(order.getTotalPrice())
                 .deliveryAddress(order.getDeliveryAddress())
                 .items(order.getOrderItems().stream()
@@ -76,8 +78,12 @@ public class OrderSagaOrchestrator {
                 .occurredAt(LocalDateTime.now())
                 .build();
 
-        eventPublisher.publishOrderCreated(event);
-
+        eventPublisher.publish(
+                KafkaTopics.ORDER_CREATED,          // topic
+                order.getId().toString(),           // key (aggregateId - 순서 보장)
+                "ORDER_CREATED",                    // eventType
+                event                               // payload (DomainEvent 구현체)
+        );
         // notification-service: 결제 진행 중 알림
         publishStatusChangedEvent(order, Order.OrderStatus.READY, Order.OrderStatus.PENDING);
     }
@@ -107,13 +113,18 @@ public class OrderSagaOrchestrator {
         // shipment-service로 배달 요청 이벤트 발행
         ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
-                .userName(order.getUserName())
+                .userId(order.getUserId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .requestNote(order.getRequestNote())
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishShipmentRequested(shipmentEvent);
+
+        eventPublisher.publish(
+                KafkaTopics.SHIPMENT_REQUESTED,
+                order.getId().toString(),
+                "SHIPMENT_REQUESTED",
+                shipmentEvent
+        );
 
         // notification-service: 결제 완료(CONFIRMED) 상태 변경 알림
         publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED);
@@ -168,23 +179,44 @@ public class OrderSagaOrchestrator {
                 || prevStatus == Order.OrderStatus.CONFIRMED;
         boolean needsShipmentCancel = prevStatus == Order.OrderStatus.CONFIRMED;
 
+        // 재고 복구 필요 여부: READY 이후 상태에서 취소 = 재고 예약이 완료된 상태
+        // READY: 주문 생성됐지만 재고 예약 전 → 복구 불필요
+        // PENDING 이상: 재고 예약 완료 → 복구 필요
+        boolean needsStockRestore = prevStatus != Order.OrderStatus.READY;
+
+        // 복구 대상 상품 목록 (OrderItem 에서 추출)
+        List<StockRestoreItem> stockRestoreItems =
+                order.getOrderItems().stream()
+                        .map(item -> OrderCancelledEvent.StockRestoreItem.builder()
+                                .productId(item.getProductId())   // OrderItem 에 productId 필드 있어야 함
+                                .quantity(item.getQuantity())
+                                .build())
+                        .toList();
+
         // payment-service / shipment-service로 취소 이벤트 발행
         OrderCancelledEvent cancelledEvent = OrderCancelledEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
-                .userName(order.getUserName())
+                .userId(order.getUserId())
+                .orderItems(order.getOrderItems())
                 .cancelledBy(cancelledBy)
                 .requiresPaymentCancellation(needsPaymentCancel)
                 .requiresShipmentCancellation(needsShipmentCancel)
+                .requiresStockRestore(needsStockRestore)        // 추가
+                .stockRestoreItems(stockRestoreItems)           // 추가
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderCancelled(cancelledEvent);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_CANCELLED,
+                order.getId().toString(),
+                "ORDER_CANCELLED",
+                cancelledEvent
+        );
 
         // notification-service: 취소 알림
         publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CANCELLED);
 
-        log.info("[SAGA][CANCEL] 완료 - orderId={}, paymentCancel={}, shipmentCancel={}",
-                order.getId(), needsPaymentCancel, needsShipmentCancel);
+        log.info("[SAGA][CANCEL] 완료 - orderId={}", order.getId());
     }
 
     // ================================================================
@@ -226,13 +258,18 @@ public class OrderSagaOrchestrator {
                                            Order.OrderStatus currentStatus) {
         OrderStatusChangedEvent event = OrderStatusChangedEvent.builder()
                 .orderId(order.getId())
-                .userName(order.getUserName())
-                .companyId(order.getCompanyId())
+                .userId(order.getUserId())
                 .previousStatus(prevStatus.name())
                 .currentStatus(currentStatus.name())
                 .occurredAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderStatusChanged(event);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_STATUS_CHANGED,
+                order.getId().toString(),
+                "ORDER_STATUS_CHANGED",
+                event
+        );
     }
 
     /**
@@ -241,15 +278,21 @@ public class OrderSagaOrchestrator {
     private void publishOrderCompletedEvent(Order order) {
         OrderCompletedEvent event = OrderCompletedEvent.builder()
                 .orderId(order.getId())
-                .companyId(order.getCompanyId())
-                .userName(order.getUserName())
+                .userId(order.getUserId())
                 .productNames(order.getOrderItems().stream()
                         .map(item -> item.getProductName())
                         .toList())
                 .totalPrice(order.getTotalPrice())
                 .completedAt(LocalDateTime.now())
                 .build();
-        eventPublisher.publishOrderCompleted(event);
+
+        eventPublisher.publish(
+                KafkaTopics.ORDER_COMPLETED,
+                order.getId().toString(),
+                "ORDER_COMPLETED",
+                event
+        );
+
         log.info("[SAGA] 리뷰 요청 이벤트 발행 완료 - orderId={}", order.getId());
     }
 

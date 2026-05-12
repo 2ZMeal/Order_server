@@ -26,13 +26,7 @@ public class Order extends BaseEntity {
     private UUID id;
 
     @Column(name = "user_id", nullable = false, length = 100)
-    private String userId;            // customerUsername → customerId
-
-    @Column(name = "user_name", nullable = false, length = 100)
-    private String userName;
-
-    @Column(name = "company_id", nullable = false)
-    private UUID companyId;
+    private String userId;
 
     @Column(name = "delivery_address", length = 255)
     private String deliveryAddress;
@@ -46,10 +40,6 @@ public class Order extends BaseEntity {
 
     @Column(name = "request_note", columnDefinition = "TEXT")
     private String requestNote;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "order_type", nullable = false, length = 20)
-    private OrderType orderType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "saga_status", length = 30)
@@ -74,9 +64,6 @@ public class Order extends BaseEntity {
         CANCELLED    // 취소됨
     }
 
-    public enum OrderType {
-        ONLINE, OFFLINE
-    }
 
     public enum SagaStatus {
         ORDER_CREATED,       // 주문 생성, 결제 요청 이벤트 발행됨
@@ -91,16 +78,16 @@ public class Order extends BaseEntity {
     // 정적 팩토리 메서드
     // ========================
 
-    public static Order create(String userId, UUID companyId,
+    public static Order create(String userId,
+//                               UUID companyId,
                                String deliveryAddress, Integer totalPrice,
-                               String requestNote, OrderType orderType) {
+                               String requestNote) {
         return Order.builder()
                 .userId(userId)
-                .companyId(companyId)
+//                .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)
                 .requestNote(requestNote)
-                .orderType(orderType)
                 .status(OrderStatus.READY)
                 .sagaStatus(SagaStatus.ORDER_CREATED)
                 .build();
@@ -170,7 +157,7 @@ public class Order extends BaseEntity {
      */
     public void updateStatus(OrderStatus newStatus) {
         if (this.status == OrderStatus.CANCELLED || this.status == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("완료되었거나 취소된 주문은 상태를 변경할 수 없습니다.");
+            throw new CustomException(OrderErrorCode.ORDER_STATUS_ALREADY_FINAL);
         }
         validateStatusTransition(this.status, newStatus);
         this.status = newStatus;

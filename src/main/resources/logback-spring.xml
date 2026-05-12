@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+                %X{traceId}         : Zipkin 이 현재 span 의 traceId 를 MDC 에 자동 주입
+                %X{originalTraceId} : KafkaSecurityInterceptor 가 X-Original-Trace-Id 헤더에서
+                                      복원한 원본 traceId (Kafka 소비 시 연결 추적용)
+            -->
+            <pattern>
+                %d{yyyy-MM-dd HH:mm:ss.SSS} [${APP_NAME}] [traceId=%X{traceId:-none}] [originalTraceId=%X{originalTraceId:-none}] %-5level %logger{36} - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.ezmeal.order" level="DEBUG"/>
+
+</configuration>

@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
+    id 'org.springframework.boot' version '3.5.13'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -27,13 +27,14 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2025.1.1")
+    springCloudVersion = "2025.0.2"
+    datasourceMicrometerVersion = "1.4.1"
 }
 
 dependencies {
 
     // 공통 모듈
-    implementation 'com.ezmeal:common:0.0.5'
+    implementation 'com.ezmeal:common:0.1.3'
 
 //    // 롬복을 사용하기 위해 하단 두 줄 추가
 //    compileOnly 'org.projectlombok:lombok'
@@ -44,21 +45,15 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-config'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+    //implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -71,6 +66,11 @@ dependencies {
 
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     // EmbeddedKafka 지원 (실제 Kafka 없이 통합 테스트 가능)
+
+
+    // Micrometer Tracing + Zipkin (Tracer 빈 자동 등록)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
 }
 
 

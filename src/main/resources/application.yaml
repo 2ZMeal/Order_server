@@ -1,6 +1,9 @@
 spring:
   application:
     name: order-service
+  zipkin:
+    enabled: false  # 로컬에서 Zipkin 서버 없이 실행할 때
+
 
   config:
     import: "configserver:"      # Config Server에서 설정 가져옴
@@ -23,12 +26,18 @@ spring:
       ddl-auto: update
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         default_batch_fetch_size: 100
     open-in-view: false
 
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+    consumer:                                                       # 추가된 블록
+      group-id: order-service-group
+      auto-offset-reset: earliest
+
+      enable-auto-commit: false
 
 # 타 MSA 서비스 URL (Eureka 사용 시 서비스명으로 대체 가능)
 services:
@@ -40,8 +49,10 @@ services:
 server:
   port: 8082
 
+
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, metrics
+  tracing:
+    sampling:
+      probability: 1.0  # 1.0 = 100% 추적
+
+

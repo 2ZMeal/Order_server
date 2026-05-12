@@ -15,7 +15,7 @@ public interface OrderRepository {
     Page<Order> findByCompanyId(UUID companyId, Pageable pageable);
     Page<Order> searchWithFilters(
             UUID companyId,
-            String userName,
+            String userId,
             Order.OrderStatus status,
             String productName,
             Integer minAmount,

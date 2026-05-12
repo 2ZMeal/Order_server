@@ -22,7 +22,6 @@ public class OrderResponseDto {
     private String sagaStatus;
     private Integer totalPrice;
     private String requestNote;
-    private String orderType;
     private List<OrderItemDto> items;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
@@ -31,13 +30,11 @@ public class OrderResponseDto {
         return OrderResponseDto.builder()
                 .orderId(order.getId())
                 .userId(order.getUserId())
-                .companyId(order.getCompanyId())
                 .deliveryAddress(order.getDeliveryAddress())
                 .status(order.getStatus().name())
                 .sagaStatus(order.getSagaStatus() != null ? order.getSagaStatus().name() : null)
                 .totalPrice(order.getTotalPrice())
                 .requestNote(order.getRequestNote())
-                .orderType(order.getOrderType().name())
                 .items(order.getOrderItems().stream()
                         .map(OrderItemDto::from)
                         .collect(Collectors.toList()))

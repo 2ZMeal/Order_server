@@ -6,16 +6,11 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/**
- * payment-service → order-service 수신 메시지
- * Topic: payment.result
- */
 @Getter
 @NoArgsConstructor
-public class PaymentResultMessage implements DomainEvent {
+public class StockRestoreResultMessage implements DomainEvent {
     private UUID orderId;
-    private UUID paymentId;
-    private String userId;
     private boolean success;
-    private String reason;     // 실패 시 사유
+    private String reason;      // 실패 시 사유
+    private String productId;   // 실패한 상품 ID (실패 시)
 }

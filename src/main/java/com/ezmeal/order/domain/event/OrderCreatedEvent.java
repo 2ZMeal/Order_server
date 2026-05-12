@@ -4,6 +4,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import com.ezmeal.common.message.DomainEvent;
 
 /**
  * SAGA Step 1: 주문 생성 완료
@@ -13,11 +14,11 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderCreatedEvent {
+public class OrderCreatedEvent implements DomainEvent {
 
     private UUID orderId;
     private UUID companyId;
-    private String userName;
+    private String userId;
     private Integer totalPrice;
     private String deliveryAddress;
     private List<OrderItemPayload> items;
