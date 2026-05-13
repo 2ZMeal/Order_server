@@ -151,7 +151,7 @@ public class OrderEventConsumer {
      * 실패: DLQ 저장 → 수동 처리 필요
      */
     @KafkaListener(
-            topics = KafkaTopics.STOCK_RESTORE_RESULT,
+            topics = KafkaTopics.PRODUCT_QUANTITY_RESTORED,
             groupId = "order-service-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
@@ -172,8 +172,8 @@ public class OrderEventConsumer {
                         result.getOrderId(), result.getReason(), result.getProductId());
 
                 dlqEventJpaRepository.save(DlqEventRecord.create(
-                        KafkaTopics.STOCK_RESTORE_RESULT,
-                        KafkaTopics.STOCK_RESTORE_RESULT + ".FAILED",
+                        KafkaTopics.PRODUCT_QUANTITY_RESTORED,
+                        KafkaTopics.PRODUCT_QUANTITY_RESTORED + ".FAILED",
                         result.getOrderId().toString(),
                         result.toString(),
                         "재고 복구 실패: " + result.getReason()
