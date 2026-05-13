@@ -27,6 +27,6 @@ public interface ProductClient {
             @RequestBody ProductOrderCountRequest request
     );
 
-    @GetMapping("/api/v1/products/by-ids")
+    @GetMapping("/internal/v1/products/by-ids")
     List<ProductInfo> getProductsByIds(@RequestParam("ids") List<UUID> ids);
 }

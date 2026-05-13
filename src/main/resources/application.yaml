@@ -42,9 +42,9 @@ spring:
 # 타 MSA 서비스 URL (Eureka 사용 시 서비스명으로 대체 가능)
 services:
   company:
-    url: ${STORE_SERVICE_URL:http://company-service}
+    url: ${STORE_SERVICE_URL:http://company-service:19082}
   product:
-    url: ${PRODUCT_SERVICE_URL:http://product-service}
+    url: ${PRODUCT_SERVICE_URL:http://product-service:19083}
 
 server:
   port: 8082

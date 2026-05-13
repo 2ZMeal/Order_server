@@ -8,6 +8,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @FeignClient(name = "company-service", url = "${services.company.url}")
 public interface CompanyClient {
 
-    @GetMapping("/api/v1/companys/by-company")
+    @GetMapping("/api/v1/companies/by-company")
     CompanyInfo getCompanyByCompany(@RequestParam("userId") String companyUserId);
 }
