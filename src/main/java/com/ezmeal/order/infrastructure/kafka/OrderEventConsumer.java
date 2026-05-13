@@ -6,7 +6,9 @@ import com.ezmeal.common.security.principal.CustomUserPrincipal;
 import com.ezmeal.common.enums.Role;
 import com.ezmeal.order.application.saga.OrderSagaOrchestrator;
 import com.ezmeal.order.domain.dlq.DlqEventRecord;
-import com.ezmeal.order.infrastructure.kafka.dto.PaymentResultMessage;
+import com.ezmeal.order.infrastructure.kafka.dto.PaymentCancelledMessage;
+import com.ezmeal.order.infrastructure.kafka.dto.PaymentCompletedMessage;
+import com.ezmeal.order.infrastructure.kafka.dto.PaymentFailedMessage;
 import com.ezmeal.order.infrastructure.kafka.dto.StockRestoreResultMessage;
 import com.ezmeal.order.infrastructure.persistence.DlqEventJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,42 +35,111 @@ public class OrderEventConsumer {
     private final InboxProcessor inboxProcessor;            // 공통 모듈 주입
     private final DlqEventJpaRepository dlqEventJpaRepository;
 
-    // ── 결제 결과 수신 ─────────────────────────────────────────────
-    /**
-     * payment-service 로부터 결제 결과 수신
-     *
-     * 공통 모듈 KafkaConsumerConfig 의 StringJsonMessageConverter 가
-     * JSON 문자열을 EventEnvelope<PaymentResultMessage> 로 자동 역직렬화
-     *
-     * InboxProcessor.processOnce() 로 중복 수신 방어
-     */
+    // ================================================================
+    // 결제 완료 수신
+    // payment-service: approvePayment() 성공 시 발행
+    // ================================================================
     @KafkaListener(
-            topics = KafkaTopics.PAYMENT_RESULT,
-            groupId = "order-service-group",
+            topics = KafkaTopics.PAYMENT_COMPLETED,   // "payment-completed-event-topic"
+            groupId = "order-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumePaymentResult(EventEnvelope<PaymentResultMessage> envelope) {
-
-        // processOnce(): 같은 eventId 가 오면 람다식 안 실행 (멱등성 보장)
+    public void consumePaymentCompleted(EventEnvelope<PaymentCompletedMessage> envelope) {
         inboxProcessor.processOnce(envelope.eventId(), () -> {
 
-            PaymentResultMessage result = envelope.payload();
-            log.info("[Kafka][CONSUME] payment.result - orderId={}, success={}",
-                    result.getOrderId(), result.isSuccess());
+            PaymentCompletedMessage payload = envelope.payload();
+            log.info("[Kafka][CONSUME] payment-completed - orderId={}, paymentId={}",
+                    payload.getOrderId(), payload.getPaymentId());
 
-            if (result.isSuccess()) {
-                sagaOrchestrator.onPaymentCompleted(
-                        result.getOrderId(),
-                        result.getPaymentId()
-                );
-            } else {
-                sagaOrchestrator.onPaymentFailed(
-                        result.getOrderId(),
-                        result.getReason()
-                );
-            }
+            // Order CONFIRMED 처리 + shipment.requested 발행
+            sagaOrchestrator.onPaymentCompleted(
+                    payload.getOrderId(),
+                    payload.getPaymentId()
+            );
         });
     }
+
+    // ================================================================
+    // 결제 취소 수신
+    // payment-service: cancelPayment() 완료 시 발행
+    // ================================================================
+    @KafkaListener(
+            topics = KafkaTopics.PAYMENT_CANCELLED,   // "payment-cancelled-event-topic"
+            groupId = "order-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumePaymentCancelled(EventEnvelope<PaymentCancelledMessage> envelope) {
+        inboxProcessor.processOnce(envelope.eventId(), () -> {
+
+            PaymentCancelledMessage payload = envelope.payload();
+            log.info("[Kafka][CONSUME] payment-cancelled - orderId={}, reason={}",
+                    payload.getOrderId(), payload.getReason());
+
+            // Order CANCELLED 처리 (결제 취소로 인한 보상)
+            sagaOrchestrator.onPaymentFailed(
+                    payload.getOrderId(),
+                    payload.getReason()
+            );
+        });
+    }
+
+    // 결제 실패 수신
+    @KafkaListener(
+            topics = KafkaTopics.PAYMENT_FAILED,  // "payment-failed-event-topic"
+            groupId = "order-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumePaymentFailed(EventEnvelope<PaymentFailedMessage> envelope) {
+        inboxProcessor.processOnce(envelope.eventId(), () -> {
+
+            PaymentFailedMessage payload = envelope.payload();
+            log.warn("[Kafka][CONSUME] payment-failed - orderId={}, reason={}",
+                    payload.getOrderId(), payload.getReason());
+
+            // Order CANCELLED 처리 (결제 실패로 인한 SAGA 보상)
+            sagaOrchestrator.onPaymentFailed(
+                    payload.getOrderId(),
+                    payload.getReason()
+            );
+        });
+    }
+
+//    // ── 결제 결과 수신 ─────────────────────────────────────────────
+//    /**
+//     * payment-service 로부터 결제 결과 수신
+//     *
+//     * 공통 모듈 KafkaConsumerConfig 의 StringJsonMessageConverter 가
+//     * JSON 문자열을 EventEnvelope<PaymentResultMessage> 로 자동 역직렬화
+//     *
+//     * InboxProcessor.processOnce() 로 중복 수신 방어
+//     */
+//    @KafkaListener(
+//            topics = KafkaTopics.PAYMENT_RESULT,
+//            groupId = "order-service-group",
+//            containerFactory = "kafkaListenerContainerFactory"
+//    )
+//    public void consumePaymentResult(EventEnvelope<PaymentResultMessage> envelope) {
+//
+//        // processOnce(): 같은 eventId 가 오면 람다식 안 실행 (멱등성 보장)
+//        inboxProcessor.processOnce(envelope.eventId(), () -> {
+//
+//            PaymentResultMessage result = envelope.payload();
+//            log.info("[Kafka][CONSUME] payment.result - orderId={}, success={}",
+//                    result.getOrderId(), result.isSuccess());
+//
+//            if (result.isSuccess()) {
+//                sagaOrchestrator.onPaymentCompleted(
+//                        result.getOrderId(),
+//                        result.getPaymentId()
+//                );
+//            } else {
+//                sagaOrchestrator.onPaymentFailed(
+//                        result.getOrderId(),
+//                        result.getReason()
+//                );
+//            }
+//        });
+//    }
 
 
 
