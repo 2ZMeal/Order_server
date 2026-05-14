@@ -21,11 +21,11 @@ public interface ProductClient {
                                                  @RequestBody ProductOrderCountRequest request
     );
 
-    @PostMapping("/internal/v1/products/{productId}/order-quantity/restore")
-    CommonApiResponse<Void> restoreOrderQuantity(
-            @PathVariable UUID productId,
-            @RequestBody ProductOrderCountRequest request
-    );
+//    @PostMapping("/internal/v1/products/{productId}/order-quantity/restore")
+//    CommonApiResponse<Void> restoreOrderQuantity(
+//            @PathVariable UUID productId,
+//            @RequestBody ProductOrderCountRequest request
+//    );
 
     @GetMapping("/internal/v1/products/by-ids")
     List<ProductInfo> getProductsByIds(@RequestParam("ids") List<UUID> ids);
