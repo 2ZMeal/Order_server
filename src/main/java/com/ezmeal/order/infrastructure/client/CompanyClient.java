@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface CompanyClient {
 
     @GetMapping("/api/v1/companies/by-company")
-    CompanyInfo getCompanyByCompany(@RequestParam("userId") String companyUserId);
+    CompanyInfo getCompanyByCompany(@RequestParam("managerUserId") String managerUserId);
 }
