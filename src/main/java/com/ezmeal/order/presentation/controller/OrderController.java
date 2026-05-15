@@ -62,7 +62,7 @@ public class OrderController {
 
     @GetMapping("/{orderId}")
     @Operation(summary = "주문 단건 조회")
-    public ResponseEntity<CommonApiResponse<OrderResponseDto>> getOrder(@PathVariable UUID orderId) {
+    public ResponseEntity<CommonApiResponse<OrderResponseDto>> getOrder(@PathVariable(value="orderId") UUID orderId) {
         return ResponseEntity.ok(CommonApiResponse.success(orderService.selectOrder(orderId)));
     }
 
@@ -90,7 +90,7 @@ public class OrderController {
                    → payment-service 결제 취소 + shipment-service 배달 취소(CONFIRMED 상태였을 때) 이벤트 발행
                    """)
     public ResponseEntity<CommonApiResponse<OrderResponseDto>> cancelOrder(
-            @PathVariable UUID orderId,
+            @PathVariable(value="orderId") UUID orderId,
             @AuthenticationPrincipal CustomUserPrincipal principal) {
 
         OrderResponseDto response = orderService.cancelOrder(orderId, principal);
@@ -107,7 +107,7 @@ public class OrderController {
                    모든 상태 변경 시 notification-service 상태 알림 발행
                    """)
     public ResponseEntity<CommonApiResponse<OrderResponseDto>> updateStatus(
-            @PathVariable UUID orderId,
+            @PathVariable(value="orderId") UUID orderId,
             @RequestParam Order.OrderStatus status,
             @AuthenticationPrincipal CustomUserPrincipal principal) {
 

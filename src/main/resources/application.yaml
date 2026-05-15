@@ -32,7 +32,6 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
     consumer:                                                       # 추가된 블록
       group-id: order-service-group
       auto-offset-reset: earliest
