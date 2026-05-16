@@ -6,7 +6,8 @@ spring:
 
 
   config:
-    import: "configserver:"      # Config Server에서 설정 가져옴
+#    import: "configserver:"      # Config Server에서 설정 가져옴
+    import: "optional:configserver:"   # optional 추가 → 없어도 무시
   cloud:
     config:
       uri: http://config-server:8888
