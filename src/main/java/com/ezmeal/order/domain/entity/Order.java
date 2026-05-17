@@ -28,6 +28,10 @@ public class Order extends BaseEntity {
     @Column(name = "user_id", nullable = false, length = 100)
     private String userId;
 
+//    //삭제 예정
+//    @Column(name = "company_id", nullable = false)
+//    private UUID companyId;
+
     @Column(name = "delivery_address", length = 255)
     private String deliveryAddress;
 
@@ -80,10 +84,12 @@ public class Order extends BaseEntity {
 
     public static Order create(String userId,
 //                               UUID companyId,
+//                               UUID companyId,
                                String deliveryAddress, Integer totalPrice,
                                String requestNote) {
         return Order.builder()
                 .userId(userId)
+//                .companyId(companyId)
 //                .companyId(companyId)
                 .deliveryAddress(deliveryAddress)
                 .totalPrice(totalPrice)

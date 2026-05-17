@@ -103,16 +103,25 @@ public class OrderService {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
 
-
-
-
-
-        // 상품 정보 조회 (product-service FeignClient)
+        // ── [임시] product-service 없이 테스트용 하드코딩 ──────────────────
         List<UUID> productIds = dto.getProducts().stream()
                 .map(OrderRequestDto.ProductItem::getProductId)
                 .toList();
-        List<ProductInfo> products = productClient.getProductsByIds(productIds);
 
+        List<ProductInfo> products = productIds.stream()
+                .map(productId -> buildMockProductInfo(productId, UUID.randomUUID(), "테스트 상품", 10000))
+                .toList();
+        // ─────────────────────────────────────────────────────────────────
+
+
+
+//원래 코드
+//        // 상품 정보 조회 (product-service FeignClient)
+//        List<UUID> productIds = dto.getProducts().stream()
+//                .map(OrderRequestDto.ProductItem::getProductId)
+//                .toList();
+//        List<ProductInfo> products = productClient.getProductsByIds(productIds);
+//
         Map<UUID, ProductInfo> productMap = products.stream()
                 .collect(Collectors.toMap(ProductInfo::getProductId, p -> p));
 
@@ -126,9 +135,13 @@ public class OrderService {
                     return p.getPrice() * item.getQuantity();
                 }).sum();
 
+//        //mockCompanyId 삭제 예정
+//        UUID mockCompanyId = UUID.fromString("00000000-0000-0000-0000-000000000099"); // 임시
+
         // Order 엔티티 생성
         Order order = Order.create(
                 principal.getUserId(),
+//                mockCompanyId,           //삭제 예정
                 dto.getAddress(),
                 totalPrice,
                 dto.getComment()
@@ -154,26 +167,33 @@ public class OrderService {
 
         for (OrderRequestDto.ProductItem product : dto.getProducts()) {
             try {
-                CommonApiResponse<Void> response = productClient.reserveOrderQuantity(
-                        product.getProductId(),
-                        new ProductOrderCountRequest(product.getQuantity(), savedOrder.getId())
-                );
+                // ── [임시] 재고 예약도 성공으로 하드코딩 ──────────────────
+                log.info("[재고 예약 성공 - 임시] productId={}, quantity={}",
+                        product.getProductId(), product.getQuantity());
+                reservedItems.add(product);
 
-                // product-service 가 성공 응답 반환 시
-                if (response != null && "SUCCESS".equals(response.getCode())) {
-                    reservedItems.add(product);   // 성공 목록에 추가
-                    log.info("[재고 예약 성공] productId={}, quantity={}",
-                            product.getProductId(), product.getQuantity());
 
-                } else {
-                    // product-service 가 실패 응답 반환 시 (재고 부족 등)
-                    log.warn("[재고 예약 실패] productId={}, 롤백 시작",
-                            product.getProductId());
-
-                    cancelOrderInternal(savedOrder, principal.getUserId());
-
-                    throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
-                }
+//원래 코드
+//                CommonApiResponse<Void> response = productClient.reserveOrderQuantity(
+//                        product.getProductId(),
+//                        new ProductOrderCountRequest(product.getQuantity(), savedOrder.getId())
+//                );
+//
+//                // product-service 가 성공 응답 반환 시
+//                if (response != null && "SUCCESS".equals(response.getCode())) {
+//                    reservedItems.add(product);   // 성공 목록에 추가
+//                    log.info("[재고 예약 성공] productId={}, quantity={}",
+//                            product.getProductId(), product.getQuantity());
+//
+//                } else {
+//                    // product-service 가 실패 응답 반환 시 (재고 부족 등)
+//                    log.warn("[재고 예약 실패] productId={}, 롤백 시작",
+//                            product.getProductId());
+//
+//                    cancelOrderInternal(savedOrder, principal.getUserId());
+//
+//                    throw new CustomException(OrderErrorCode.STOCK_RESERVE_FAILED);
+//                }
 
             } catch (CustomException e) {
                 // CustomException 은 그대로 위로 던짐
@@ -196,6 +216,24 @@ public class OrderService {
 
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
         return OrderResponseDto.from(savedOrder);
+    }
+
+    // 임시 헬퍼 메서드 - 테스트 후 삭제
+    private ProductInfo buildMockProductInfo(UUID productId, UUID companyId, String name, int price) {
+        try {
+            ProductInfo info = new ProductInfo();
+            java.lang.reflect.Field f1 = ProductInfo.class.getDeclaredField("productId");
+            java.lang.reflect.Field f2 = ProductInfo.class.getDeclaredField("companyId");
+            java.lang.reflect.Field f3 = ProductInfo.class.getDeclaredField("name");
+            java.lang.reflect.Field f4 = ProductInfo.class.getDeclaredField("price");
+            f1.setAccessible(true); f1.set(info, productId);
+            f2.setAccessible(true); f2.set(info, companyId);
+            f3.setAccessible(true); f3.set(info, name);
+            f4.setAccessible(true); f4.set(info, price);
+            return info;
+        } catch (Exception e) {
+            throw new RuntimeException("MockProductInfo 생성 실패", e);
+        }
     }
 
     /**
