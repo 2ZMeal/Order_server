@@ -1,5 +1,6 @@
 package com.ezmeal.order.domain.event;
 
+import java.util.List;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,10 +18,23 @@ import com.ezmeal.common.message.DomainEvent;
 public class ShipmentRequestedEvent implements DomainEvent {
 
     private UUID orderId;
-    private UUID companyId;
+    private UUID companyId;      // 업체별 구분
     private String userId;
     private String deliveryAddress;
     private String requestNote;
+    private List<OrderItemPayload> items;  // 해당 업체의 주문 아이템 목록
     private LocalDateTime occurredAt;
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OrderItemPayload {
+        private UUID orderItemId;
+        private UUID productId;
+        private String productName;
+        private Integer productPrice;
+        private Integer quantity;
+    }
 }
 

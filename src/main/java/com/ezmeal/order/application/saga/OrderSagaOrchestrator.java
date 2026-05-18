@@ -3,12 +3,15 @@ package com.ezmeal.order.application.saga;
 import com.ezmeal.common.exception.CustomException;
 import com.ezmeal.common.message.CommonKafkaEventPublisher;  // 추가
 import com.ezmeal.order.domain.entity.Order;
+import com.ezmeal.order.domain.entity.OrderItem;
 import com.ezmeal.order.domain.event.*;
 import com.ezmeal.order.domain.event.OrderCancelledEvent.StockRestoreItem;
 import com.ezmeal.order.domain.exception.OrderErrorCode;
 import com.ezmeal.order.domain.repository.OrderRepository;
 import com.ezmeal.order.infrastructure.kafka.KafkaTopics;  // 추가
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -110,27 +113,75 @@ public class OrderSagaOrchestrator {
         order.markPaymentCompleted();
         orderRepository.save(order);
 
-        // shipment-service로 배달 요청 이벤트 발행
-        ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
-                .orderId(order.getId())
-                .userId(order.getUserId())
-                .deliveryAddress(order.getDeliveryAddress())
-                .requestNote(order.getRequestNote())
-                .occurredAt(LocalDateTime.now())
-                .build();
+        // ── 업체별로 orderItems 그룹핑 ────────────────────────────────
+        // 한 주문 안에 여러 업체의 상품이 있을 수 있으므로 companyId 기준으로 분리
+        Map<UUID, List<OrderItem>> itemsByCompany = order.getOrderItems().stream()
+                .collect(Collectors.groupingBy(OrderItem::getCompanyId));
 
-        eventPublisher.publish(
-                KafkaTopics.SHIPMENT_REQUESTED,
-                order.getId().toString(),
-                "SHIPMENT_REQUESTED",
-                shipmentEvent
-        );
+        log.info("[SAGA][STEP2] 업체 수={}, orderId={}", itemsByCompany.size(), orderId);
+
+        // ── 업체별로 배달 요청 이벤트 발행 ───────────────────────────
+        itemsByCompany.forEach((companyId, items) -> {
+
+            List<ShipmentRequestedEvent.OrderItemPayload> itemPayloads = items.stream()
+                    .map(item -> ShipmentRequestedEvent.OrderItemPayload.builder()
+                            .orderItemId(item.getId())
+                            .productId(item.getProductId())
+                            .productName(item.getProductName())
+                            .productPrice(item.getProductPrice())
+                            .quantity(item.getQuantity())
+                            .build())
+                    .toList();
+
+            ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
+                    .orderId(order.getId())
+                    .companyId(companyId)           // 업체 ID
+                    .userId(order.getUserId())
+                    .deliveryAddress(order.getDeliveryAddress())
+                    .requestNote(order.getRequestNote())
+                    .items(itemPayloads)            // 해당 업체 아이템만
+                    .occurredAt(LocalDateTime.now())
+                    .build();
+
+            eventPublisher.publish(
+                    KafkaTopics.SHIPMENT_REQUESTED,
+                    order.getId().toString(),       // key: orderId 기준 순서 보장
+                    "SHIPMENT_REQUESTED",
+                    shipmentEvent
+            );
+
+            log.info("[SAGA][STEP2] 배달 요청 발행 - orderId={}, companyId={}, 상품 수={}",
+                    orderId, companyId, items.size());
+        });
 
         // notification-service: 결제 완료(CONFIRMED) 상태 변경 알림
         publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED);
 
         log.info("[SAGA][STEP2] 완료 - orderId={}, status=CONFIRMED", orderId);
     }
+
+
+//        // shipment-service로 배달 요청 이벤트 발행
+//        ShipmentRequestedEvent shipmentEvent = ShipmentRequestedEvent.builder()
+//                .orderId(order.getId())
+//                .userId(order.getUserId())
+//                .deliveryAddress(order.getDeliveryAddress())
+//                .requestNote(order.getRequestNote())
+//                .occurredAt(LocalDateTime.now())
+//                .build();
+//
+//        eventPublisher.publish(
+//                KafkaTopics.SHIPMENT_REQUESTED,
+//                order.getId().toString(),
+//                "SHIPMENT_REQUESTED",
+//                shipmentEvent
+//        );
+//
+//        // notification-service: 결제 완료(CONFIRMED) 상태 변경 알림
+//        publishStatusChangedEvent(order, prevStatus, Order.OrderStatus.CONFIRMED);
+//
+//        log.info("[SAGA][STEP2] 완료 - orderId={}, status=CONFIRMED", orderId);
+//    }
 
     // ================================================================
     // SAGA 보상: 결제 실패 → 주문 취소 + 취소 알림 발행
