@@ -103,6 +103,15 @@ public class OrderService {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
 
+//        // ── [임시] product-service 없이 테스트용 하드코딩 ──────────────────
+//        List<UUID> productIds = dto.getProducts().stream()
+//                .map(OrderRequestDto.ProductItem::getProductId)
+//                .toList();
+//
+//        List<ProductInfo> products = productIds.stream()
+//                .map(productId -> buildMockProductInfo(productId, UUID.randomUUID(), "테스트 상품", 10000))
+//                .toList();
+//        // ─────────────────────────────────────────────────────────────────
 
 
 
@@ -125,6 +134,8 @@ public class OrderService {
                     }
                     return p.getPrice() * item.getQuantity();
                 }).sum();
+
+
 
         // Order 엔티티 생성
         Order order = Order.create(
@@ -154,6 +165,13 @@ public class OrderService {
 
         for (OrderRequestDto.ProductItem product : dto.getProducts()) {
             try {
+//                // ── [임시] 재고 예약도 성공으로 하드코딩 ──────────────────
+//                log.info("[재고 예약 성공 - 임시] productId={}, quantity={}",
+//                        product.getProductId(), product.getQuantity());
+//                reservedItems.add(product);
+
+
+
                 CommonApiResponse<Void> response = productClient.reserveOrderQuantity(
                         product.getProductId(),
                         new ProductOrderCountRequest(product.getQuantity(), savedOrder.getId())
@@ -197,6 +215,24 @@ public class OrderService {
         log.info("[OrderService] 주문 생성 완료 - orderId={}", savedOrder.getId());
         return OrderResponseDto.from(savedOrder);
     }
+
+//    // 임시 헬퍼 메서드 - 테스트 후 삭제
+//    private ProductInfo buildMockProductInfo(UUID productId, UUID companyId, String name, int price) {
+//        try {
+//            ProductInfo info = new ProductInfo();
+//            java.lang.reflect.Field f1 = ProductInfo.class.getDeclaredField("productId");
+//            java.lang.reflect.Field f2 = ProductInfo.class.getDeclaredField("companyId");
+//            java.lang.reflect.Field f3 = ProductInfo.class.getDeclaredField("name");
+//            java.lang.reflect.Field f4 = ProductInfo.class.getDeclaredField("price");
+//            f1.setAccessible(true); f1.set(info, productId);
+//            f2.setAccessible(true); f2.set(info, companyId);
+//            f3.setAccessible(true); f3.set(info, name);
+//            f4.setAccessible(true); f4.set(info, price);
+//            return info;
+//        } catch (Exception e) {
+//            throw new RuntimeException("MockProductInfo 생성 실패", e);
+//        }
+
 
     /**
      * 재고 예약 실패로 인한 주문 내부 취소 처리

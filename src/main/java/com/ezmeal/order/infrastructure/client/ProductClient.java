@@ -17,15 +17,15 @@ import java.util.List;
 public interface ProductClient {
 
     @PostMapping("/internal/v1/products/{productId}/order-quantity/reserve")
-    CommonApiResponse<Void> reserveOrderQuantity(@PathVariable UUID productId,
+    CommonApiResponse<Void> reserveOrderQuantity(@PathVariable(value="productId") UUID productId,
                                                  @RequestBody ProductOrderCountRequest request
     );
 
-    @PostMapping("/internal/v1/products/{productId}/order-quantity/restore")
-    CommonApiResponse<Void> restoreOrderQuantity(
-            @PathVariable UUID productId,
-            @RequestBody ProductOrderCountRequest request
-    );
+//    @PostMapping("/internal/v1/products/{productId}/order-quantity/restore")
+//    CommonApiResponse<Void> restoreOrderQuantity(
+//            @PathVariable UUID productId,
+//            @RequestBody ProductOrderCountRequest request
+//    );
 
     @GetMapping("/internal/v1/products/by-ids")
     List<ProductInfo> getProductsByIds(@RequestParam("ids") List<UUID> ids);
