@@ -9,7 +9,8 @@ import com.ezmeal.order.domain.dlq.DlqEventRecord;
 import com.ezmeal.order.infrastructure.kafka.dto.PaymentCancelledMessage;
 import com.ezmeal.order.infrastructure.kafka.dto.PaymentCompletedMessage;
 import com.ezmeal.order.infrastructure.kafka.dto.PaymentFailedMessage;
-import com.ezmeal.order.infrastructure.kafka.dto.StockRestoreResultMessage;
+import com.ezmeal.order.infrastructure.kafka.dto.StockRestoreFailedMessage;
+import com.ezmeal.order.infrastructure.kafka.dto.StockRestoredMessage;
 import com.ezmeal.order.infrastructure.persistence.DlqEventJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -141,46 +142,92 @@ public class OrderEventConsumer {
 //        });
 //    }
 
-
-
-    // ── 재고 복구 결과 수신 ────────────────────────────────────────
-    /**
-     * product-service 가 재고 복구 후 발행하는 결과 이벤트 수신
-     *
-     * 성공: 로그 기록
-     * 실패: DLQ 저장 → 수동 처리 필요
-     */
+    // ================================================================
+    // 재고 복구 성공 수신
+    // product-service: restoreReservedQuantity() 성공 시 발행
+    // ================================================================
     @KafkaListener(
-            topics = KafkaTopics.PRODUCT_QUANTITY_RESTORED,
+            topics = KafkaTopics.STOCK_RESTORED,      // "product.quantity.restored"
             groupId = "order-service-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumeStockRestoreResult(EventEnvelope<StockRestoreResultMessage> envelope) {
-
+    public void consumeStockRestored(EventEnvelope<StockRestoredMessage> envelope) {
         inboxProcessor.processOnce(envelope.eventId(), () -> {
 
-            StockRestoreResultMessage result = envelope.payload();
+            StockRestoredMessage payload = envelope.payload();
+            log.info("[Kafka][CONSUME] product.quantity.restored - orderId={}, productId={}, quantity={}",
+                    payload.getOrderId(), payload.getProductId(), payload.getQuantity());
 
-            log.info("[Kafka][CONSUME] stock.restore.result - orderId={}, success={}",
-                    result.getOrderId(), result.isSuccess());
-
-            if (result.isSuccess()) {
-                log.info("[재고 복구 완료] orderId={}", result.getOrderId());
-
-            } else {
-                log.error("[재고 복구 실패] orderId={}, reason={}, productId={}",
-                        result.getOrderId(), result.getReason(), result.getProductId());
-
-                dlqEventJpaRepository.save(DlqEventRecord.create(
-                        KafkaTopics.PRODUCT_QUANTITY_RESTORED,
-                        KafkaTopics.PRODUCT_QUANTITY_RESTORED + ".FAILED",
-                        result.getOrderId().toString(),
-                        result.toString(),
-                        "재고 복구 실패: " + result.getReason()
-                ));
-            }
+            // 재고 복구 완료 → 로그 기록만 (추가 비즈니스 로직 없음)
         });
     }
+
+    // ================================================================
+    // 재고 복구 실패 수신
+    // product-service: restoreReservedQuantity() 실패 시 발행
+    // ================================================================
+    @KafkaListener(
+            topics = KafkaTopics.STOCK_RESTORE_FAILED, // "product.quantity.restore.failed"
+            groupId = "order-service-group",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumeStockRestoreFailed(EventEnvelope<StockRestoreFailedMessage> envelope) {
+        inboxProcessor.processOnce(envelope.eventId(), () -> {
+
+            StockRestoreFailedMessage payload = envelope.payload();
+            log.error("[Kafka][CONSUME] product.quantity.restore.failed - orderId={}, productId={}, reason={}",
+                    payload.getOrderId(), payload.getProductId(), payload.getReason());
+
+            // 재고 복구 실패 → DLQ 저장 (수동 처리 필요)
+            dlqEventJpaRepository.save(DlqEventRecord.create(
+                    KafkaTopics.STOCK_RESTORE_FAILED,
+                    KafkaTopics.STOCK_RESTORE_FAILED + ".DLQ",
+                    payload.getOrderId().toString(),
+                    payload.toString(),
+                    "재고 복구 실패: " + payload.getReason()
+            ));
+        });
+    }
+
+
+//    // ── 재고 복구 결과 수신 ────────────────────────────────────────
+//    /**
+//     * product-service 가 재고 복구 후 발행하는 결과 이벤트 수신
+//     *
+//     * 성공: 로그 기록
+//     * 실패: DLQ 저장 → 수동 처리 필요
+//     */
+//    @KafkaListener(
+//            topics = KafkaTopics.PRODUCT_QUANTITY_RESTORED,
+//            groupId = "order-service-group",
+//            containerFactory = "kafkaListenerContainerFactory"
+//    )
+//    public void consumeStockRestoreResult(EventEnvelope<StockRestoreResultMessage> envelope) {
+//
+//        inboxProcessor.processOnce(envelope.eventId(), () -> {
+//
+//            StockRestoreResultMessage result = envelope.payload();
+//
+//            log.info("[Kafka][CONSUME] stock.restore.result - orderId={}, success={}",
+//                    result.getOrderId(), result.isSuccess());
+//
+//            if (result.isSuccess()) {
+//                log.info("[재고 복구 완료] orderId={}", result.getOrderId());
+//
+//            } else {
+//                log.error("[재고 복구 실패] orderId={}, reason={}, productId={}",
+//                        result.getOrderId(), result.getReason(), result.getProductId());
+//
+//                dlqEventJpaRepository.save(DlqEventRecord.create(
+//                        KafkaTopics.PRODUCT_QUANTITY_RESTORED,
+//                        KafkaTopics.PRODUCT_QUANTITY_RESTORED + ".FAILED",
+//                        result.getOrderId().toString(),
+//                        result.toString(),
+//                        "재고 복구 실패: " + result.getReason()
+//                ));
+//            }
+//        });
+//    }
 
     // ── payment.result DLT 수신 ────────────────────────────────────
     @KafkaListener(

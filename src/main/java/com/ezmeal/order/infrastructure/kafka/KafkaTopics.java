@@ -25,9 +25,11 @@ public final class KafkaTopics {
     public static final String PAYMENT_CANCELLED    = "payment.cancelled";
     public static final String PAYMENT_FAILED       = "payment.failed";
 
-    // 추가: 재고 복구 결과 수신 (product-service 가 발행)
-    public static final String PRODUCT_QUANTITY_RESTORED = "product.quantity.restored";
-
+//    // 추가: 재고 복구 결과 수신 (product-service 가 발행)
+//    public static final String PRODUCT_QUANTITY_RESTORED = "product.quantity.restored";
+//  변경: product-service 발행 토픽 (성공/실패 분리)
+    public static final String STOCK_RESTORED       = "product.quantity.restored";
+    public static final String STOCK_RESTORE_FAILED = "product.quantity.restore.failed";
 
     private KafkaTopics() {}
 }
