@@ -1,0 +1,93 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.13'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.ezmeal'
+version = '0.0.1-SNAPSHOT'
+description = 'order'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "GitHubPackages"
+        url = uri("https://maven.pkg.github.com/2ZMeal/Common_server")
+        credentials {
+            username = System.getenv("GPR_USER")
+            password = System.getenv("GPR_TOKEN")
+        }
+    }
+}
+
+ext {
+    springCloudVersion = "2025.0.2"
+    datasourceMicrometerVersion = "1.4.1"
+}
+
+dependencies {
+
+    // 공통 모듈
+    implementation 'com.ezmeal:common:0.1.4'
+
+//    // 롬복을 사용하기 위해 하단 두 줄 추가
+//    compileOnly 'org.projectlombok:lombok'
+//    annotationProcessor 'org.projectlombok:lombok'
+
+    // 인프라
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    //implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+    compileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'org.postgresql:postgresql'
+    annotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'com.h2database:h2'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    // EmbeddedKafka 지원 (실제 Kafka 없이 통합 테스트 가능)
+
+
+    // Micrometer Tracing + Zipkin (Tracer 빈 자동 등록)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave'
+
+
+
+    // security test (user() 메서드 사용을 위해 필요)
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'com.h2database:h2'   // 추가
+}
+
+
+// 공통 모듈 사용을 위해 하단 dependencyManagement 추가 필요
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
