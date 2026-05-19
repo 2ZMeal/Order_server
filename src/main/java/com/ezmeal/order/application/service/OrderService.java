@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+//TODO: 읽기용 서비스파일을 새로 만들던가, 각 메서드에 Transactional을 각각 붙일 필요가 있습니다.
 @Transactional(readOnly = true)
 public class OrderService {
 
@@ -96,7 +97,7 @@ public class OrderService {
     // 주문 생성 → SAGA 시작
     // ========================
 
-//    @Transactional
+    @Transactional
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public OrderResponseDto createOrder(CustomUserPrincipal principal, OrderRequestDto dto) {
 
