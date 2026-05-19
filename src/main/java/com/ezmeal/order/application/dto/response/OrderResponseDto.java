@@ -16,7 +16,6 @@ public class OrderResponseDto {
 
     private UUID orderId;
     private String userId;
-    private UUID companyId;
     private String deliveryAddress;
     private String status;
     private String sagaStatus;
@@ -46,12 +45,16 @@ public class OrderResponseDto {
     @Getter
     @Builder
     public static class OrderItemDto {
+        private UUID companyId;
+        private UUID productId;
         private String productName;
         private Integer productPrice;
         private Integer quantity;
 
         public static OrderItemDto from(OrderItem item) {
             return OrderItemDto.builder()
+                    .companyId(item.getCompanyId())
+                    .productId(item.getProductId())
                     .productName(item.getProductName())
                     .productPrice(item.getProductPrice())
                     .quantity(item.getQuantity())
